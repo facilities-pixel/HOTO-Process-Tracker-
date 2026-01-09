@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Data Entry - HOT Process</title>
+    <title>Data Entry - HOTO Process</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
@@ -800,7 +800,6 @@
         
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
-            loadFloors();
             updateStats();
             setDefaultDates();
         });
@@ -850,7 +849,7 @@
         }
         
         // Load floors for selected tower
-        function loadFloors() {
+        function loadFloats() {
             const tower = document.getElementById('keyTower').value;
             const floorButtons = document.getElementById('floorButtons');
             const flatGrid = document.getElementById('flatGrid');
@@ -1186,11 +1185,8 @@
             // Get documents checkboxes
             const documents = {
                 keys: document.getElementById('docKeys').checked,
-                warranty: document.getElementById('docWarranty').checked,
                 manual: document.getElementById('docManual').checked,
-                amc: document.getElementById('docAMC').checked,
-                snag: document.getElementById('docSnag').checked,
-                noc: document.getElementById('docNOC').checked
+                amc: document.getElementById('docAMC').checked
             };
             
             // Save to localStorage
@@ -1235,7 +1231,7 @@
             document.getElementById('hotoFeedback').value = '';
             document.getElementById('hotoCompleted').checked = false;
             
-            const docCheckboxes = ['docKeys', 'docWarranty', 'docManual', 'docAMC', 'docSnag', 'docNOC'];
+            const docCheckboxes = ['docKeys', 'docManual', 'docAMC'];
             docCheckboxes.forEach(id => {
                 document.getElementById(id).checked = false;
             });
@@ -1320,23 +1316,12 @@
             const flat = document.getElementById('moveinFlat').value;
             const customer = document.getElementById('moveinCustomer').value;
             const moveinDateTime = document.getElementById('moveinDateTime').value;
-            const completed = document.getElementById('moveinCompleted').checked;
             
             // Validation
             if (!tower || !flat || !customer || !moveinDateTime) {
                 alert('Please fill all required fields (*)');
                 return;
             }
-            
-            // Get amenities checkboxes
-            const amenities = {
-                water: document.getElementById('amenWater').checked,
-                electricity: document.getElementById('amenElectricity').checked,
-                gas: document.getElementById('amenGas').checked,
-                internet: document.getElementById('amenInternet').checked,
-                parking: document.getElementById('amenParking').checked,
-                club: document.getElementById('amenClub').checked
-            };
             
             // Save to localStorage
             let hotData = JSON.parse(localStorage.getItem('hot_process_data') || '{"towers":{"A":{"flats":{}},"B":{"flats":{}},"C":{"flats":{}}}}');
@@ -1350,11 +1335,8 @@
                 customer: customer,
                 date: moveinDateTime,
                 contact: document.getElementById('moveinContact').value || null,
-                coordinator: document.getElementById('moveinCoordinator').value || null,
-                deposit: document.getElementById('moveinDeposit').value || null,
-                amenities: amenities,
                 remarks: document.getElementById('moveinRemarks').value || null,
-                status: completed ? 'completed' : 'pending',
+                status: 'completed',
                 timestamp: new Date().toISOString()
             };
             
@@ -1379,15 +1361,7 @@
             document.getElementById('moveinFlat').value = '';
             document.getElementById('moveinCustomer').value = '';
             document.getElementById('moveinContact').value = '';
-            document.getElementById('moveinCoordinator').value = '';
             document.getElementById('moveinRemarks').value = '';
-            document.getElementById('moveinCompleted').checked = false;
-            document.getElementById('moveinDeposit').value = '';
-            
-            const amenCheckboxes = ['amenWater', 'amenElectricity', 'amenGas', 'amenInternet', 'amenParking', 'amenClub'];
-            amenCheckboxes.forEach(id => {
-                document.getElementById(id).checked = false;
-            });
         }
         
         // Notify project team
