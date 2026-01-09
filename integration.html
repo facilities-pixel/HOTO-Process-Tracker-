@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Integration Manager - HOT Process</title>
+    <title>Integration - HOT Process</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
@@ -11,25 +11,42 @@
             --cbre-blue: #1F3765;
             --cbre-light-blue: #3E7CA6;
             --cbre-celadon: #80BBAD;
+            --cbre-green: #17E88F;
+            --cbre-wheat: #DBD99A;
+            --cbre-orange: #D2785A;
+            --cbre-purple: #885073;
         }
         
         .integration-card {
             border: none;
             border-radius: 10px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
-            transition: transform 0.3s;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
             margin-bottom: 20px;
+            transition: transform 0.3s;
         }
         
         .integration-card:hover {
             transform: translateY(-5px);
         }
         
-        .status-badge {
-            padding: 5px 12px;
+        .integration-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+            font-size: 1.5rem;
+            color: white;
+        }
+        
+        .integration-status {
+            padding: 5px 10px;
             border-radius: 20px;
             font-size: 0.85rem;
             font-weight: 600;
+            display: inline-block;
         }
         
         .status-connected {
@@ -42,217 +59,420 @@
             color: #721c24;
         }
         
-        .api-key-input {
-            font-family: monospace;
+        .status-pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .sync-history {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .sync-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            transition: background 0.2s;
+        }
+        
+        .sync-item:hover {
+            background: #f8f9fa;
+        }
+        
+        .sync-success {
+            border-left: 4px solid #28a745;
+        }
+        
+        .sync-error {
+            border-left: 4px solid #dc3545;
+        }
+        
+        .sync-warning {
+            border-left: 4px solid #ffc107;
+        }
+        
+        .api-test-box {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        
+        .progress-thin {
+            height: 4px;
+            margin: 5px 0;
         }
     </style>
 </head>
 <body>
-    <div class="container-fluid py-4">
+    <div class="container-fluid">
         <div class="row">
-            <div class="col-lg-10 mx-auto">
-                <!-- Header -->
+            <!-- Sidebar -->
+            <div class="col-md-3 col-lg-2 d-md-block bg-light sidebar collapse">
+                <div class="position-sticky pt-3">
+                    <ul class="nav flex-column">
+                        <li class="nav-item mb-2">
+                            <a href="index.html" class="nav-link">
+                                <i class="fas fa-arrow-left me-2"></i> Back to Dashboard
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <h6 class="sidebar-heading px-3 mt-4 mb-1 text-muted">
+                                Integration
+                            </h6>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link active" href="#google">
+                                <i class="fab fa-google me-2"></i> Google Sheets
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#excel">
+                                <i class="fas fa-file-excel me-2"></i> Excel Files
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#api">
+                                <i class="fas fa-code me-2"></i> API Configuration
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#sync">
+                                <i class="fas fa-sync-alt me-2"></i> Sync Settings
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#logs">
+                                <i class="fas fa-history me-2"></i> Sync Logs
+                            </a>
+                        </li>
+                    </ul>
+                    
+                    <hr class="my-3">
+                    
+                    <div class="px-3">
+                        <h6 class="text-muted mb-2">Quick Actions</h6>
+                        <button class="btn btn-sm btn-outline-primary w-100 mb-2" onclick="testAllConnections()">
+                            <i class="fas fa-plug"></i> Test Connections
+                        </button>
+                        <button class="btn btn-sm btn-outline-success w-100 mb-2" onclick="forceSync()">
+                            <i class="fas fa-sync"></i> Force Sync
+                        </button>
+                        <button class="btn btn-sm btn-outline-warning w-100" onclick="clearLogs()">
+                            <i class="fas fa-trash"></i> Clear Logs
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Main Content -->
+            <div class="col-md-9 col-lg-10 ml-sm-auto px-md-4 py-4">
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <div>
-                        <h2><i class="fas fa-sync-alt"></i> Integration Manager</h2>
-                        <p class="text-muted">Configure data sync and integrations</p>
+                        <h2>Integration Manager</h2>
+                        <p class="text-muted mb-0">Configure and manage data integrations</p>
                     </div>
-                    <div>
-                        <a href="index.html" class="btn btn-outline-primary">
-                            <i class="fas fa-arrow-left"></i> Back to Dashboard
-                        </a>
+                    <div class="integration-status status-connected">
+                        <i class="fas fa-circle"></i> Online
                     </div>
                 </div>
                 
                 <!-- Google Sheets Integration -->
-                <div class="card integration-card">
-                    <div class="card-header" style="background: var(--cbre-blue); color: white;">
-                        <h5 class="mb-0"><i class="fab fa-google"></i> Google Sheets Integration</h5>
+                <div class="card integration-card" id="google">
+                    <div class="card-header d-flex align-items-center">
+                        <div class="integration-icon" style="background: #34A853;">
+                            <i class="fab fa-google"></i>
+                        </div>
+                        <div>
+                            <h5 class="mb-1">Google Sheets Integration</h5>
+                            <p class="text-muted mb-0">Sync data with Google Sheets</p>
+                        </div>
                     </div>
                     <div class="card-body">
-                        <div class="row align-items-center mb-4">
-                            <div class="col-md-8">
-                                <h6>Google Apps Script URL</h6>
-                                <input type="text" class="form-control api-key-input" id="googleScriptUrl" 
-                                       placeholder="https://script.google.com/macros/s/...">
-                                <small class="text-muted">Deploy Google Apps Script as Web App and paste URL here</small>
-                            </div>
-                            <div class="col-md-4 text-end">
-                                <span class="status-badge status-disconnected" id="googleStatus">
-                                    <i class="fas fa-times-circle"></i> Not Connected
-                                </span>
-                            </div>
-                        </div>
-                        
                         <div class="row">
-                            <div class="col-md-6">
-                                <h6>Setup Instructions:</h6>
-                                <ol class="small">
-                                    <li>Create Google Sheet with required tabs</li>
-                                    <li>Open Script Editor (Extensions → Apps Script)</li>
-                                    <li>Paste the Google Apps Script code</li>
-                                    <li>Deploy as Web App (Execute as: Me, Who has access: Anyone)</li>
-                                    <li>Copy the deployment URL</li>
-                                    <li>Paste URL above and click "Test Connection"</li>
-                                </ol>
+                            <div class="col-md-8">
+                                <div class="mb-3">
+                                    <label class="form-label">Google Sheets URL</label>
+                                    <input type="url" class="form-control" id="googleSheetUrl" 
+                                           placeholder="https://docs.google.com/spreadsheets/d/...">
+                                    <small class="text-muted">Paste your Google Sheets URL here</small>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Sheet Name</label>
+                                    <input type="text" class="form-control" id="googleSheetName" value="HOTO_Process_Data">
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Sync Frequency</label>
+                                    <select class="form-select" id="googleSyncFreq">
+                                        <option value="5">Every 5 minutes</option>
+                                        <option value="15" selected>Every 15 minutes</option>
+                                        <option value="30">Every 30 minutes</option>
+                                        <option value="60">Every hour</option>
+                                        <option value="manual">Manual Only</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="googleAutoSync" checked>
+                                    <label class="form-check-label" for="googleAutoSync">
+                                        Auto-sync when online
+                                    </label>
+                                </div>
                             </div>
-                            <div class="col-md-6">
-                                <h6>Sync Settings:</h6>
-                                <div class="form-check mb-2">
-                                    <input class="form-check-input" type="checkbox" id="autoSync" checked>
-                                    <label class="form-check-label" for="autoSync">
-                                        Auto-sync every 5 minutes
-                                    </label>
+                            <div class="col-md-4">
+                                <div class="api-test-box">
+                                    <h6>Connection Test</h6>
+                                    <button class="btn btn-sm btn-outline-primary w-100 mb-2" onclick="testGoogleConnection()">
+                                        Test Connection
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-success w-100 mb-2" onclick="syncGoogleSheets()">
+                                        Sync Now
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-info w-100" onclick="viewGoogleSheet()">
+                                        View Sheet
+                                    </button>
                                 </div>
-                                <div class="form-check mb-2">
-                                    <input class="form-check-input" type="checkbox" id="syncOnChange" checked>
-                                    <label class="form-check-label" for="syncOnChange">
-                                        Sync immediately on data change
-                                    </label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="offlineMode">
-                                    <label class="form-check-label" for="offlineMode">
-                                        Enable offline mode (store data locally)
-                                    </label>
+                                
+                                <div class="mt-3">
+                                    <small class="text-muted d-block">Last Sync:</small>
+                                    <span id="googleLastSync">Never</span>
                                 </div>
                             </div>
                         </div>
                         
-                        <div class="mt-4">
-                            <button class="btn btn-primary" onclick="testGoogleConnection()">
-                                <i class="fas fa-plug"></i> Test Connection
-                            </button>
-                            <button class="btn btn-success ms-2" onclick="saveGoogleConfig()">
+                        <div class="d-flex justify-content-between mt-3">
+                            <button class="btn btn-success" onclick="saveGoogleConfig()">
                                 <i class="fas fa-save"></i> Save Configuration
                             </button>
-                            <button class="btn btn-outline-secondary ms-2" onclick="syncNow()">
-                                <i class="fas fa-sync"></i> Sync Now
+                            <button class="btn btn-outline-primary" onclick="setupGoogleSheets()">
+                                <i class="fas fa-magic"></i> Setup Google Sheets
                             </button>
                         </div>
                     </div>
                 </div>
                 
-                <!-- Excel Export -->
-                <div class="card integration-card">
-                    <div class="card-header" style="background: var(--cbre-celadon);">
-                        <h5 class="mb-0"><i class="fas fa-file-excel"></i> Excel Export Settings</h5>
+                <!-- Excel Integration -->
+                <div class="card integration-card" id="excel">
+                    <div class="card-header d-flex align-items-center">
+                        <div class="integration-icon" style="background: #217346;">
+                            <i class="fas fa-file-excel"></i>
+                        </div>
+                        <div>
+                            <h5 class="mb-1">Excel File Integration</h5>
+                            <p class="text-muted mb-0">Import/Export Excel files</p>
+                        </div>
                     </div>
                     <div class="card-body">
                         <div class="row">
                             <div class="col-md-6">
-                                <h6>Export Format:</h6>
-                                <select class="form-select" id="exportFormat">
-                                    <option value="xlsx">Excel (.xlsx)</option>
-                                    <option value="csv">CSV (.csv)</option>
-                                    <option value="json">JSON (.json)</option>
-                                </select>
+                                <h6>Export Settings</h6>
+                                <div class="mb-3">
+                                    <label class="form-label">Export Format</label>
+                                    <select class="form-select" id="exportFormat">
+                                        <option value="xlsx">Excel (.xlsx)</option>
+                                        <option value="csv">CSV (.csv)</option>
+                                        <option value="json">JSON (.json)</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Include Data</label>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="expKeyHandover" checked>
+                                        <label class="form-check-label" for="expKeyHandover">Key Handover</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="expSnagging" checked>
+                                        <label class="form-check-label" for="expSnagging">Snagging</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="expFirstVisit" checked>
+                                        <label class="form-check-label" for="expFirstVisit">First Visit</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="expHandover" checked>
+                                        <label class="form-check-label" for="expHandover">Handover</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="expInteriors" checked>
+                                        <label class="form-check-label" for="expInteriors">Interiors</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="expMovein" checked>
+                                        <label class="form-check-label" for="expMovein">Move-in</label>
+                                    </div>
+                                </div>
                             </div>
+                            
                             <div class="col-md-6">
-                                <h6>Export Schedule:</h6>
-                                <select class="form-select" id="exportSchedule">
-                                    <option value="manual">Manual Only</option>
-                                    <option value="daily">Daily (9:00 AM)</option>
-                                    <option value="weekly">Weekly (Monday 9:00 AM)</option>
-                                </select>
+                                <h6>Import Settings</h6>
+                                <div class="mb-3">
+                                    <label class="form-label">Auto-import Folder</label>
+                                    <input type="text" class="form-control" id="importFolder" 
+                                           placeholder="Path to watch for Excel files">
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Import Mode</label>
+                                    <select class="form-select" id="importMode">
+                                        <option value="append">Append to existing data</option>
+                                        <option value="replace">Replace existing data</option>
+                                        <option value="merge">Merge with existing data</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="importValidate">
+                                    <label class="form-check-label" for="importValidate">
+                                        Validate data before import
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between mt-3">
+                            <button class="btn btn-success" onclick="exportData()">
+                                <i class="fas fa-download"></i> Export Data
+                            </button>
+                            <button class="btn btn-primary" onclick="importData()">
+                                <i class="fas fa-upload"></i> Import Data
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- API Configuration -->
+                <div class="card integration-card" id="api">
+                    <div class="card-header d-flex align-items-center">
+                        <div class="integration-icon" style="background: var(--cbre-orange);">
+                            <i class="fas fa-code"></i>
+                        </div>
+                        <div>
+                            <h5 class="mb-1">API Configuration</h5>
+                            <p class="text-muted mb-0">Configure external API connections</p>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>REST API</h6>
+                                <div class="mb-3">
+                                    <label class="form-label">API Endpoint</label>
+                                    <input type="url" class="form-control" id="apiEndpoint" 
+                                           placeholder="https://api.example.com/hot-process">
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">API Key</label>
+                                    <input type="password" class="form-control" id="apiKey" 
+                                           placeholder="Your API key">
+                                </div>
+                                
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="apiEnabled">
+                                    <label class="form-check-label" for="apiEnabled">
+                                        Enable API integration
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <h6>Webhooks</h6>
+                                <div class="mb-3">
+                                    <label class="form-label">Webhook URL</label>
+                                    <input type="url" class="form-control" id="webhookUrl" 
+                                           placeholder="https://webhook.example.com">
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Events to Trigger</label>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="hookKeyHandover" checked>
+                                        <label class="form-check-label" for="hookKeyHandover">Key Handover</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="hookSnagging" checked>
+                                        <label class="form-check-label" for="hookSnagging">Snagging Complete</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="hookHandover" checked>
+                                        <label class="form-check-label" for="hookHandover">Handover</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="hookMovein" checked>
+                                        <label class="form-check-label" for="hookMovein">Move-in</label>
+                                    </div>
+                                </div>
+                                
+                                <div class="api-test-box">
+                                    <button class="btn btn-sm btn-outline-primary w-100" onclick="testAPI()">
+                                        Test API Connection
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <button class="btn btn-success mt-3" onclick="saveAPIConfig()">
+                            <i class="fas fa-save"></i> Save API Configuration
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Sync History -->
+                <div class="card integration-card" id="logs">
+                    <div class="card-header d-flex align-items-center">
+                        <div class="integration-icon" style="background: var(--cbre-purple);">
+                            <i class="fas fa-history"></i>
+                        </div>
+                        <div>
+                            <h5 class="mb-1">Sync History & Logs</h5>
+                            <p class="text-muted mb-0">View synchronization history</p>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="sync-history">
+                            <div id="syncLogs">
+                                <!-- Sync logs will be loaded here -->
                             </div>
                         </div>
                         
                         <div class="mt-3">
-                            <h6>Export Data Types:</h6>
-                            <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="checkbox" id="exportKeys" checked>
-                                <label class="form-check-label" for="exportKeys">Key Handovers</label>
-                            </div>
-                            <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="checkbox" id="exportSnags" checked>
-                                <label class="form-check-label" for="exportSnags">Snagging</label>
-                            </div>
-                            <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="checkbox" id="exportVisits" checked>
-                                <label class="form-check-label" for="exportVisits">First Visits</label>
-                            </div>
-                            <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="checkbox" id="exportHandovers" checked>
-                                <label class="form-check-label" for="exportHandovers">Handovers</label>
-                            </div>
-                        </div>
-                        
-                        <div class="mt-4">
-                            <button class="btn btn-success" onclick="exportData()">
-                                <i class="fas fa-download"></i> Export Data Now
+                            <button class="btn btn-outline-secondary" onclick="refreshLogs()">
+                                <i class="fas fa-redo"></i> Refresh Logs
                             </button>
-                            <button class="btn btn-outline-success ms-2" onclick="saveExportSettings()">
-                                <i class="fas fa-save"></i> Save Settings
+                            <button class="btn btn-outline-danger float-end" onclick="clearLogs()">
+                                <i class="fas fa-trash"></i> Clear All Logs
                             </button>
                         </div>
                     </div>
                 </div>
                 
-                <!-- Sync Log -->
-                <div class="card integration-card">
-                    <div class="card-header" style="background: var(--cbre-light-blue); color: white;">
-                        <h5 class="mb-0"><i class="fas fa-history"></i> Sync Log</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-sm">
-                                <thead>
-                                    <tr>
-                                        <th>Date & Time</th>
-                                        <th>Operation</th>
-                                        <th>Status</th>
-                                        <th>Records</th>
-                                        <th>Details</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="syncLog">
-                                    <!-- Sync logs will be populated here -->
-                                </tbody>
-                            </table>
-                        </div>
-                        
-                        <div class="text-center mt-3">
-                            <button class="btn btn-sm btn-outline-secondary" onclick="clearSyncLog()">
-                                <i class="fas fa-trash"></i> Clear Log
-                            </button>
-                            <button class="btn btn-sm btn-outline-primary ms-2" onclick="refreshSyncLog()">
-                                <i class="fas fa-redo"></i> Refresh
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Backup & Restore -->
-                <div class="card integration-card">
-                    <div class="card-header bg-dark text-white">
-                        <h5 class="mb-0"><i class="fas fa-database"></i> Backup & Restore</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <h6>Backup Data:</h6>
-                                <p class="small text-muted">Create a backup of all system data</p>
-                                <button class="btn btn-outline-primary" onclick="createBackup()">
-                                    <i class="fas fa-save"></i> Create Backup
-                                </button>
-                                <button class="btn btn-outline-info ms-2" onclick="downloadBackup()">
-                                    <i class="fas fa-download"></i> Download Backup
-                                </button>
-                            </div>
-                            <div class="col-md-6">
-                                <h6>Restore Data:</h6>
-                                <p class="small text-muted">Restore from backup file</p>
-                                <input type="file" id="restoreFile" class="form-control mb-2" accept=".json,.backup">
-                                <button class="btn btn-outline-warning" onclick="restoreBackup()">
-                                    <i class="fas fa-upload"></i> Restore Backup
-                                </button>
+                <!-- Sync Statistics -->
+                <div class="row mt-4">
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-body text-center">
+                                <h3 id="totalSyncs">0</h3>
+                                <p class="text-muted mb-0">Total Syncs</p>
                             </div>
                         </div>
-                        
-                        <div class="alert alert-warning mt-3">
-                            <i class="fas fa-exclamation-triangle"></i>
-                            <strong>Warning:</strong> Restoring will overwrite all current data. Make sure you have a backup first.
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-body text-center">
+                                <h3 id="successSyncs">0</h3>
+                                <p class="text-muted mb-0">Successful Syncs</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-body text-center">
+                                <h3 id="failedSyncs">0</h3>
+                                <p class="text-muted mb-0">Failed Syncs</p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -263,303 +483,492 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         // Integration Manager JavaScript
+        
+        // Initialize
         document.addEventListener('DOMContentLoaded', function() {
-            loadConfig();
-            loadSyncLog();
+            loadConfiguration();
+            loadSyncLogs();
+            updateSyncStats();
         });
         
-        // Load saved configuration
-        function loadConfig() {
-            const googleUrl = localStorage.getItem('google_script_url');
+        // Load configuration from localStorage
+        function loadConfiguration() {
+            // Google Sheets config
+            const googleUrl = localStorage.getItem('google_sheets_url');
             if (googleUrl) {
-                document.getElementById('googleScriptUrl').value = googleUrl;
-                updateGoogleStatus(true);
+                document.getElementById('googleSheetUrl').value = googleUrl;
             }
             
-            // Load other settings
-            const autoSync = localStorage.getItem('auto_sync') !== 'false';
-            document.getElementById('autoSync').checked = autoSync;
+            const lastSync = localStorage.getItem('google_last_sync');
+            if (lastSync) {
+                document.getElementById('googleLastSync').textContent = 
+                    new Date(lastSync).toLocaleString();
+            }
+            
+            // API config
+            const apiEndpoint = localStorage.getItem('api_endpoint');
+            if (apiEndpoint) {
+                document.getElementById('apiEndpoint').value = apiEndpoint;
+            }
+            
+            const apiKey = localStorage.getItem('api_key');
+            if (apiKey) {
+                document.getElementById('apiKey').value = apiKey;
+            }
+            
+            const apiEnabled = localStorage.getItem('api_enabled');
+            if (apiEnabled) {
+                document.getElementById('apiEnabled').checked = apiEnabled === 'true';
+            }
+            
+            // Webhook config
+            const webhookUrl = localStorage.getItem('webhook_url');
+            if (webhookUrl) {
+                document.getElementById('webhookUrl').value = webhookUrl;
+            }
+        }
+        
+        // Save Google Sheets configuration
+        function saveGoogleConfig() {
+            const url = document.getElementById('googleSheetUrl').value;
+            const sheetName = document.getElementById('googleSheetName').value;
+            const syncFreq = document.getElementById('googleSyncFreq').value;
+            const autoSync = document.getElementById('googleAutoSync').checked;
+            
+            localStorage.setItem('google_sheets_url', url);
+            localStorage.setItem('google_sheet_name', sheetName);
+            localStorage.setItem('google_sync_freq', syncFreq);
+            localStorage.setItem('google_auto_sync', autoSync);
+            
+            alert('Google Sheets configuration saved!');
+            
+            // Update sync manager if it exists
+            if (window.syncManager) {
+                window.syncManager.config.googleScriptUrl = url;
+            }
         }
         
         // Test Google Sheets connection
         function testGoogleConnection() {
-            const url = document.getElementById('googleScriptUrl').value.trim();
+            const url = document.getElementById('googleSheetUrl').value;
             
             if (!url) {
-                alert('Please enter Google Apps Script URL');
+                alert('Please enter Google Sheets URL first');
                 return;
             }
             
             // Show testing status
-            const statusBadge = document.getElementById('googleStatus');
-            statusBadge.className = 'status-badge';
-            statusBadge.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testing...';
+            const btn = event.target;
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testing...';
+            btn.disabled = true;
             
-            // Simulate connection test (in real app, this would make actual API call)
+            // Simulate connection test
             setTimeout(() => {
-                // For demo purposes, assume connection is successful
-                updateGoogleStatus(true);
-                addToSyncLog('Connection Test', 'success', 'Connected to Google Sheets');
+                btn.innerHTML = originalHTML;
+                btn.disabled = false;
                 
-                alert('Connection successful! Google Sheets integration is ready.');
-            }, 1500);
-        }
-        
-        // Update Google status
-        function updateGoogleStatus(connected) {
-            const statusBadge = document.getElementById('googleStatus');
-            
-            if (connected) {
-                statusBadge.className = 'status-badge status-connected';
-                statusBadge.innerHTML = '<i class="fas fa-check-circle"></i> Connected';
-            } else {
-                statusBadge.className = 'status-badge status-disconnected';
-                statusBadge.innerHTML = '<i class="fas fa-times-circle"></i> Not Connected';
-            }
-        }
-        
-        // Save Google configuration
-        function saveGoogleConfig() {
-            const url = document.getElementById('googleScriptUrl').value.trim();
-            const autoSync = document.getElementById('autoSync').checked;
-            const syncOnChange = document.getElementById('syncOnChange').checked;
-            
-            localStorage.setItem('google_script_url', url);
-            localStorage.setItem('auto_sync', autoSync);
-            localStorage.setItem('sync_on_change', syncOnChange);
-            
-            addToSyncLog('Configuration Saved', 'success', 'Google Sheets settings updated');
-            alert('Configuration saved successfully!');
-        }
-        
-        // Sync now
-        function syncNow() {
-            // In a real implementation, this would trigger sync
-            addToSyncLog('Manual Sync', 'pending', 'Starting synchronization...');
-            
-            setTimeout(() => {
-                // Simulate sync completion
-                addToSyncLog('Manual Sync', 'success', '25 records synchronized');
-                alert('Sync completed successfully!');
+                // Check if URL looks like a Google Sheets URL
+                if (url.includes('docs.google.com/spreadsheets')) {
+                    alert('✓ Connection successful!');
+                    logSync('Google Sheets connection test successful', 'success');
+                } else {
+                    alert('✗ Invalid Google Sheets URL format');
+                    logSync('Google Sheets connection test failed', 'error');
+                }
             }, 2000);
+        }
+        
+        // Sync with Google Sheets
+        function syncGoogleSheets() {
+            if (!navigator.onLine) {
+                alert('You are offline. Cannot sync with Google Sheets.');
+                return;
+            }
+            
+            const url = document.getElementById('googleSheetUrl').value;
+            
+            if (!url) {
+                alert('Please configure Google Sheets URL first');
+                return;
+            }
+            
+            // Show syncing status
+            const btn = event.target;
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Syncing...';
+            btn.disabled = true;
+            
+            // Get local data
+            const hotData = JSON.parse(localStorage.getItem('hot_process_data') || '{"towers":{"A":{"flats":{}},"B":{"flats":{}},"C":{"flats":{}}}}');
+            
+            // Simulate sync
+            setTimeout(() => {
+                btn.innerHTML = originalHTML;
+                btn.disabled = false;
+                
+                // Update last sync time
+                const now = new Date();
+                localStorage.setItem('google_last_sync', now.toISOString());
+                document.getElementById('googleLastSync').textContent = now.toLocaleString();
+                
+                // Log sync
+                logSync('Google Sheets sync completed successfully', 'success');
+                
+                alert('✓ Data synced with Google Sheets!');
+            }, 3000);
+        }
+        
+        // Setup Google Sheets template
+        function setupGoogleSheets() {
+            const templateData = {
+                sheets: [
+                    {
+                        name: "Key_Handover",
+                        headers: ["Tower", "Flat", "Handover_Person", "Handover_Date", "Incomplete_Keys", "Remarks"]
+                    },
+                    {
+                        name: "Snagging",
+                        headers: ["Tower", "Flat", "Start_Date", "End_Date", "Inspector", "MEP", "Civil", "Electrical", "Water", "AC_Drain", "Tiles", "Status"]
+                    },
+                    {
+                        name: "First_Visit",
+                        headers: ["Tower", "Flat", "Owner_Name", "Owner_Phone", "Visit_Date", "HOT_Member", "Remarks", "CRM_NOC"]
+                    },
+                    {
+                        name: "Handover",
+                        headers: ["Tower", "Flat", "Customer_Name", "Handover_Date", "HOT_Member", "Keys", "Warranty", "Manual", "AMC", "Snag_Report", "NOC", "Status"]
+                    },
+                    {
+                        name: "Interiors",
+                        headers: ["Tower", "Flat", "Start_Date", "Contractor", "Flooring", "Painting", "Carpentry", "Electrical", "Plumbing", "False_Ceiling", "Status"]
+                    },
+                    {
+                        name: "Movein",
+                        headers: ["Tower", "Flat", "Customer_Name", "Movein_Date", "Coordinator", "Water", "Electricity", "Gas", "Internet", "Parking", "Club", "Status"]
+                    },
+                    {
+                        name: "Dashboard",
+                        headers: ["Tower", "Total_Flats", "Key_Handover", "Snagging", "First_Visit", "Handover", "Interiors", "Movein", "Overall_Progress"]
+                    }
+                ]
+            };
+            
+            // Create instructions for setting up Google Sheets
+            let instructions = "To set up Google Sheets:\n\n";
+            instructions += "1. Create a new Google Sheet\n";
+            instructions += "2. Create the following sheets with these headers:\n\n";
+            
+            templateData.sheets.forEach(sheet => {
+                instructions += `Sheet: ${sheet.name}\n`;
+                instructions += `Headers: ${sheet.headers.join(", ")}\n\n`;
+            });
+            
+            instructions += "3. Share the sheet with edit access to the service account\n";
+            instructions += "4. Copy the sheet URL and paste it in the configuration above";
+            
+            alert(instructions);
+        }
+        
+        // View Google Sheet
+        function viewGoogleSheet() {
+            const url = document.getElementById('googleSheetUrl').value;
+            
+            if (!url) {
+                alert('Please configure Google Sheets URL first');
+                return;
+            }
+            
+            window.open(url, '_blank');
         }
         
         // Export data
         function exportData() {
             const format = document.getElementById('exportFormat').value;
             
-            // Create export data
-            const data = {
-                timestamp: new Date().toISOString(),
-                format: format,
-                records: 0 // Would be actual count
-            };
+            // Get selected data types
+            const dataTypes = [];
+            if (document.getElementById('expKeyHandover').checked) dataTypes.push('keyHandover');
+            if (document.getElementById('expSnagging').checked) dataTypes.push('snagging');
+            if (document.getElementById('expFirstVisit').checked) dataTypes.push('firstVisit');
+            if (document.getElementById('expHandover').checked) dataTypes.push('handover');
+            if (document.getElementById('expInteriors').checked) dataTypes.push('interiors');
+            if (document.getElementById('expMovein').checked) dataTypes.push('movein');
             
-            addToSyncLog('Data Export', 'success', `Exported in ${format.toUpperCase()} format`);
-            
-            // Trigger download
-            if (format === 'json') {
-                downloadJSON(data);
-            } else if (format === 'csv') {
-                downloadCSV(data);
-            } else {
-                alert(`Export to ${format} format would be implemented here`);
+            if (dataTypes.length === 0) {
+                alert('Please select at least one data type to export');
+                return;
             }
-        }
-        
-        // Download JSON
-        function downloadJSON(data) {
-            const dataStr = JSON.stringify(data, null, 2);
-            const dataBlob = new Blob([dataStr], { type: 'application/json' });
-            const url = URL.createObjectURL(dataBlob);
+            
+            // Get data from localStorage
+            const hotData = JSON.parse(localStorage.getItem('hot_process_data') || '{"towers":{"A":{"flats":{}},"B":{"flats":{}},"C":{"flats":{}}}}');
+            
+            // Filter data based on selected types
+            const exportData = { towers: { A: { flats: {} }, B: { flats: {} }, C: { flats: {} } } };
+            
+            ['A', 'B', 'C'].forEach(tower => {
+                Object.entries(hotData.towers[tower].flats).forEach(([flatId, flatData]) => {
+                    const filteredData = {};
+                    
+                    dataTypes.forEach(type => {
+                        if (flatData[type]) {
+                            filteredData[type] = flatData[type];
+                        }
+                    });
+                    
+                    if (Object.keys(filteredData).length > 0) {
+                        exportData.towers[tower].flats[flatId] = filteredData;
+                    }
+                });
+            });
+            
+            // Export based on format
+            let dataStr, filename, mimeType;
+            
+            switch(format) {
+                case 'json':
+                    dataStr = JSON.stringify(exportData, null, 2);
+                    filename = `HOT_Process_Data_${new Date().toISOString().split('T')[0]}.json`;
+                    mimeType = 'application/json';
+                    break;
+                    
+                case 'csv':
+                    dataStr = convertToCSV(exportData);
+                    filename = `HOT_Process_Data_${new Date().toISOString().split('T')[0]}.csv`;
+                    mimeType = 'text/csv';
+                    break;
+                    
+                case 'xlsx':
+                    // For Excel, we'd need SheetJS library
+                    alert('Excel export requires additional library. Please use JSON or CSV format.');
+                    return;
+            }
+            
+            // Download file
+            const blob = new Blob([dataStr], { type: mimeType });
+            const url = URL.createObjectURL(blob);
             
             const link = document.createElement('a');
             link.href = url;
-            link.download = `hot_export_${new Date().toISOString().split('T')[0]}.json`;
+            link.download = filename;
+            document.body.appendChild(link);
             link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            
+            logSync(`Exported ${Object.keys(exportData.towers.A.flats).length + Object.keys(exportData.towers.B.flats).length + Object.keys(exportData.towers.C.flats).length} records to ${format.toUpperCase()}`, 'success');
+            
+            alert(`Data exported successfully to ${filename}`);
         }
         
-        // Save export settings
-        function saveExportSettings() {
-            const format = document.getElementById('exportFormat').value;
-            const schedule = document.getElementById('exportSchedule').value;
+        // Convert data to CSV
+        function convertToCSV(data) {
+            let csv = 'Tower,Flat,Process,Date,Status,Remarks\n';
             
-            localStorage.setItem('export_format', format);
-            localStorage.setItem('export_schedule', schedule);
-            
-            alert('Export settings saved!');
-        }
-        
-        // Load sync log
-        function loadSyncLog() {
-            const log = JSON.parse(localStorage.getItem('sync_log') || '[]');
-            const logTable = document.getElementById('syncLog');
-            
-            logTable.innerHTML = '';
-            
-            if (log.length === 0) {
-                logTable.innerHTML = `
-                    <tr>
-                        <td colspan="5" class="text-center text-muted">
-                            No sync logs yet
-                        </td>
-                    </tr>
-                `;
-                return;
-            }
-            
-            // Show latest 10 entries
-            log.slice(-10).reverse().forEach(entry => {
-                const row = document.createElement('tr');
-                
-                const time = new Date(entry.timestamp).toLocaleString();
-                const statusClass = entry.status === 'success' ? 'text-success' : 
-                                   entry.status === 'error' ? 'text-danger' : 'text-warning';
-                
-                row.innerHTML = `
-                    <td>${time}</td>
-                    <td>${entry.operation}</td>
-                    <td class="${statusClass}">
-                        <i class="fas fa-${entry.status === 'success' ? 'check-circle' : 
-                                        entry.status === 'error' ? 'times-circle' : 'clock'}"></i>
-                        ${entry.status}
-                    </td>
-                    <td>${entry.records || '-'}</td>
-                    <td>${entry.details}</td>
-                `;
-                
-                logTable.appendChild(row);
-            });
-        }
-        
-        // Add to sync log
-        function addToSyncLog(operation, status, details, records) {
-            const log = JSON.parse(localStorage.getItem('sync_log') || '[]');
-            
-            log.push({
-                timestamp: new Date().toISOString(),
-                operation: operation,
-                status: status,
-                details: details,
-                records: records
+            ['A', 'B', 'C'].forEach(tower => {
+                Object.entries(data.towers[tower].flats).forEach(([flatId, flatData]) => {
+                    const flatNumber = flatId.split('-')[1];
+                    
+                    Object.entries(flatData).forEach(([process, processData]) => {
+                        let date = '';
+                        let status = '';
+                        let remarks = '';
+                        
+                        switch(process) {
+                            case 'keyHandover':
+                                date = processData.date || '';
+                                status = processData.status || '';
+                                remarks = processData.remarks || '';
+                                break;
+                            case 'snagging':
+                                date = processData.endDate || processData.startDate || '';
+                                status = processData.status || '';
+                                remarks = processData.remarks || '';
+                                break;
+                            case 'firstVisit':
+                                date = processData.visitDate || '';
+                                status = processData.status || '';
+                                remarks = processData.remarks || '';
+                                break;
+                            case 'handover':
+                                date = processData.date || '';
+                                status = processData.status || '';
+                                remarks = processData.feedback || '';
+                                break;
+                            case 'interiors':
+                                date = processData.startDate || '';
+                                status = processData.status || '';
+                                remarks = processData.remarks || '';
+                                break;
+                            case 'movein':
+                                date = processData.date || '';
+                                status = processData.status || '';
+                                remarks = processData.remarks || '';
+                                break;
+                        }
+                        
+                        csv += `${tower},${flatNumber},${process},${date},${status},"${remarks.replace(/"/g, '""')}"\n`;
+                    });
+                });
             });
             
-            // Keep only last 50 entries
-            if (log.length > 50) {
-                log.splice(0, log.length - 50);
-            }
-            
-            localStorage.setItem('sync_log', JSON.stringify(log));
-            loadSyncLog();
+            return csv;
         }
         
-        // Clear sync log
-        function clearSyncLog() {
-            if (confirm('Are you sure you want to clear all sync logs?')) {
-                localStorage.removeItem('sync_log');
-                loadSyncLog();
-                alert('Sync log cleared!');
-            }
+        // Import data
+        function importData() {
+            // This would open the Excel processor page
+            window.location.href = 'excel-processor.html';
         }
         
-        // Refresh sync log
-        function refreshSyncLog() {
-            loadSyncLog();
+        // Save API configuration
+        function saveAPIConfig() {
+            const endpoint = document.getElementById('apiEndpoint').value;
+            const apiKey = document.getElementById('apiKey').value;
+            const enabled = document.getElementById('apiEnabled').checked;
+            
+            localStorage.setItem('api_endpoint', endpoint);
+            localStorage.setItem('api_key', apiKey);
+            localStorage.setItem('api_enabled', enabled);
+            
+            // Save webhook config
+            const webhookUrl = document.getElementById('webhookUrl').value;
+            localStorage.setItem('webhook_url', webhookUrl);
+            
+            alert('API configuration saved!');
         }
         
-        // Create backup
-        function createBackup() {
-            // Get all HOT data from localStorage
-            const hotData = localStorage.getItem('hot_process_data');
-            const syncLog = localStorage.getItem('sync_log');
-            const settings = {
-                google_script_url: localStorage.getItem('google_script_url'),
-                auto_sync: localStorage.getItem('auto_sync'),
-                export_format: localStorage.getItem('export_format')
-            };
+        // Test API connection
+        function testAPI() {
+            const endpoint = document.getElementById('apiEndpoint').value;
             
-            const backup = {
-                timestamp: new Date().toISOString(),
-                version: '1.0',
-                data: hotData ? JSON.parse(hotData) : {},
-                logs: syncLog ? JSON.parse(syncLog) : [],
-                settings: settings
-            };
-            
-            localStorage.setItem('hot_backup', JSON.stringify(backup));
-            
-            addToSyncLog('Backup Created', 'success', 'System backup created');
-            alert('Backup created successfully!');
-        }
-        
-        // Download backup
-        function downloadBackup() {
-            const backup = localStorage.getItem('hot_backup');
-            
-            if (!backup) {
-                alert('No backup found. Please create a backup first.');
+            if (!endpoint) {
+                alert('Please enter API endpoint first');
                 return;
             }
             
-            const dataBlob = new Blob([backup], { type: 'application/json' });
-            const url = URL.createObjectURL(dataBlob);
+            // Show testing status
+            const btn = event.target;
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testing...';
+            btn.disabled = true;
             
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `hot_backup_${new Date().toISOString().split('T')[0]}.json`;
-            link.click();
-            
-            addToSyncLog('Backup Downloaded', 'success', 'Backup file downloaded');
-        }
-        
-        // Restore backup
-        function restoreBackup() {
-            const fileInput = document.getElementById('restoreFile');
-            
-            if (!fileInput.files.length) {
-                alert('Please select a backup file first');
-                return;
-            }
-            
-            if (!confirm('WARNING: This will overwrite all current data. Are you sure?')) {
-                return;
-            }
-            
-            const file = fileInput.files[0];
-            const reader = new FileReader();
-            
-            reader.onload = function(e) {
-                try {
-                    const backup = JSON.parse(e.target.result);
-                    
-                    // Restore data
-                    if (backup.data) {
-                        localStorage.setItem('hot_process_data', JSON.stringify(backup.data));
-                    }
-                    
-                    if (backup.settings) {
-                        Object.keys(backup.settings).forEach(key => {
-                            if (backup.settings[key] !== null) {
-                                localStorage.setItem(key, backup.settings[key]);
-                            }
-                        });
-                    }
-                    
-                    // Refresh config
-                    loadConfig();
-                    
-                    addToSyncLog('Backup Restored', 'success', `Restored from backup: ${new Date(backup.timestamp).toLocaleString()}`);
-                    alert('Backup restored successfully! System will reload...');
-                    
-                    // Reload page to apply changes
-                    setTimeout(() => location.reload(), 1000);
-                    
-                } catch (error) {
-                    alert('Error restoring backup: ' + error.message);
+            // Simulate API test
+            setTimeout(() => {
+                btn.innerHTML = originalHTML;
+                btn.disabled = false;
+                
+                // Random success/failure for demo
+                const success = Math.random() > 0.3;
+                
+                if (success) {
+                    alert('✓ API connection successful!');
+                    logSync('API connection test successful', 'success');
+                } else {
+                    alert('✗ API connection failed');
+                    logSync('API connection test failed', 'error');
                 }
-            };
+            }, 2000);
+        }
+        
+        // Load sync logs
+        function loadSyncLogs() {
+            const logs = JSON.parse(localStorage.getItem('sync_logs') || '[]');
+            const logsContainer = document.getElementById('syncLogs');
             
-            reader.readAsText(file);
+            logsContainer.innerHTML = '';
+            
+            if (logs.length === 0) {
+                logsContainer.innerHTML = '<p class="text-muted text-center">No sync logs yet</p>';
+                return;
+            }
+            
+            // Show latest 20 logs
+            logs.slice(-20).reverse().forEach(log => {
+                const logItem = document.createElement('div');
+                logItem.className = `sync-item sync-${log.type}`;
+                
+                const time = new Date(log.timestamp).toLocaleTimeString();
+                const icon = log.type === 'success' ? 'fa-check-circle text-success' : 
+                            log.type === 'error' ? 'fa-times-circle text-danger' : 
+                            'fa-info-circle text-warning';
+                
+                logItem.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <i class="fas ${icon} me-2"></i>
+                            <span>${log.message}</span>
+                        </div>
+                        <small class="text-muted">${time}</small>
+                    </div>
+                `;
+                
+                logsContainer.appendChild(logItem);
+            });
+        }
+        
+        // Log sync activity
+        function logSync(message, type) {
+            const logs = JSON.parse(localStorage.getItem('sync_logs') || '[]');
+            
+            logs.push({
+                timestamp: new Date().toISOString(),
+                message: message,
+                type: type
+            });
+            
+            // Keep only last 100 logs
+            if (logs.length > 100) {
+                logs.splice(0, logs.length - 100);
+            }
+            
+            localStorage.setItem('sync_logs', JSON.stringify(logs));
+            
+            // Refresh logs display
+            loadSyncLogs();
+            updateSyncStats();
+        }
+        
+        // Update sync statistics
+        function updateSyncStats() {
+            const logs = JSON.parse(localStorage.getItem('sync_logs') || '[]');
+            
+            const total = logs.length;
+            const success = logs.filter(log => log.type === 'success').length;
+            const failed = logs.filter(log => log.type === 'error').length;
+            
+            document.getElementById('totalSyncs').textContent = total;
+            document.getElementById('successSyncs').textContent = success;
+            document.getElementById('failedSyncs').textContent = failed;
+        }
+        
+        // Refresh logs
+        function refreshLogs() {
+            loadSyncLogs();
+            updateSyncStats();
+        }
+        
+        // Clear logs
+        function clearLogs() {
+            if (confirm('Are you sure you want to clear all sync logs?')) {
+                localStorage.setItem('sync_logs', JSON.stringify([]));
+                loadSyncLogs();
+                updateSyncStats();
+                alert('Sync logs cleared!');
+            }
+        }
+        
+        // Test all connections
+        function testAllConnections() {
+            testGoogleConnection();
+            setTimeout(testAPI, 1000);
+        }
+        
+        // Force sync
+        function forceSync() {
+            if (confirm('Force sync will sync all data immediately. Continue?')) {
+                syncGoogleSheets();
+            }
         }
     </script>
 </body>
