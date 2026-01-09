@@ -87,12 +87,21 @@
         .log-warning {
             color: #ffc107;
         }
+        
+        .template-card {
+            height: 100%;
+            transition: transform 0.2s;
+        }
+        
+        .template-card:hover {
+            transform: translateY(-5px);
+        }
     </style>
 </head>
 <body>
     <div class="container-fluid py-4">
         <div class="row">
-            <div class="col-lg-8 mx-auto">
+            <div class="col-lg-10 mx-auto">
                 <!-- Header -->
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <div>
@@ -161,6 +170,18 @@
                     <div class="card-body">
                         <p class="text-muted">Map Excel columns to HOT Process System fields</p>
                         
+                        <div class="mb-3">
+                            <label class="form-label">Select Data Type</label>
+                            <select class="form-select" id="dataType" onchange="updateFieldOptions()">
+                                <option value="key_handover">Key Handover Data</option>
+                                <option value="snagging">Snagging Data</option>
+                                <option value="first_visit">First Visit Data</option>
+                                <option value="handover">Handover Data</option>
+                                <option value="interiors">Interior Work Data</option>
+                                <option value="movein">Move-in Data</option>
+                            </select>
+                        </div>
+                        
                         <div class="column-mapping" id="columnMapping">
                             <!-- Mapping will be generated here -->
                         </div>
@@ -219,35 +240,85 @@
                     </div>
                     <div class="card-body">
                         <p class="text-muted">Download pre-formatted Excel templates:</p>
-                        <div class="row">
+                        <div class="row g-3">
+                            <!-- Key Handover Template -->
                             <div class="col-md-4">
-                                <div class="card border-primary">
+                                <div class="card template-card border-primary">
                                     <div class="card-body text-center">
                                         <i class="fas fa-key fa-2x text-primary mb-3"></i>
                                         <h6>Key Handover Template</h6>
+                                        <p class="small text-muted">Import key handover data</p>
                                         <button class="btn btn-sm btn-outline-primary" onclick="downloadTemplate('key_handover')">
                                             <i class="fas fa-download"></i> Download
                                         </button>
                                     </div>
                                 </div>
                             </div>
+                            
+                            <!-- Snagging Template -->
                             <div class="col-md-4">
-                                <div class="card border-success">
+                                <div class="card template-card border-success">
                                     <div class="card-body text-center">
                                         <i class="fas fa-search fa-2x text-success mb-3"></i>
                                         <h6>Snagging Template</h6>
+                                        <p class="small text-muted">Import snagging data</p>
                                         <button class="btn btn-sm btn-outline-success" onclick="downloadTemplate('snagging')">
                                             <i class="fas fa-download"></i> Download
                                         </button>
                                     </div>
                                 </div>
                             </div>
+                            
+                            <!-- First Visit Template -->
                             <div class="col-md-4">
-                                <div class="card border-warning">
+                                <div class="card template-card border-warning">
                                     <div class="card-body text-center">
                                         <i class="fas fa-calendar-check fa-2x text-warning mb-3"></i>
                                         <h6>First Visit Template</h6>
+                                        <p class="small text-muted">Import first visit data</p>
                                         <button class="btn btn-sm btn-outline-warning" onclick="downloadTemplate('first_visit')">
+                                            <i class="fas fa-download"></i> Download
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Handover Template -->
+                            <div class="col-md-4">
+                                <div class="card template-card border-info">
+                                    <div class="card-body text-center">
+                                        <i class="fas fa-handshake fa-2x text-info mb-3"></i>
+                                        <h6>Handover Template</h6>
+                                        <p class="small text-muted">Import handover data</p>
+                                        <button class="btn btn-sm btn-outline-info" onclick="downloadTemplate('handover')">
+                                            <i class="fas fa-download"></i> Download
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Interiors Template -->
+                            <div class="col-md-4">
+                                <div class="card template-card border-danger">
+                                    <div class="card-body text-center">
+                                        <i class="fas fa-hammer fa-2x text-danger mb-3"></i>
+                                        <h6>Interior Work Template</h6>
+                                        <p class="small text-muted">Import interior work data</p>
+                                        <button class="btn btn-sm btn-outline-danger" onclick="downloadTemplate('interiors')">
+                                            <i class="fas fa-download"></i> Download
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Move-in Template -->
+                            <div class="col-md-4">
+                                <div class="card template-card border-secondary">
+                                    <div class="card-body text-center">
+                                        <i class="fas fa-home fa-2x text-secondary mb-3"></i>
+                                        <h6>Move-in Template</h6>
+                                        <p class="small text-muted">Import move-in data</p>
+                                        <button class="btn btn-sm btn-outline-secondary" onclick="downloadTemplate('movein')">
                                             <i class="fas fa-download"></i> Download
                                         </button>
                                     </div>
@@ -267,8 +338,89 @@
         let excelData = null;
         let columnMapping = {};
         let importLog = [];
+        let fieldOptions = {};
         
-        // Initialize drag and drop
+        // Field options for each data type
+        const fieldOptionsData = {
+            key_handover: [
+                { value: '', label: '-- Ignore Column --' },
+                { value: 'tower', label: 'Tower (A, B, C)' },
+                { value: 'flat', label: 'Flat Number' },
+                { value: 'handover_person', label: 'Handover Person' },
+                { value: 'handover_date', label: 'Handover Date' },
+                { value: 'incomplete_keys', label: 'Incomplete Keys (YES/NO)' },
+                { value: 'key_remarks', label: 'Key Remarks' }
+            ],
+            snagging: [
+                { value: '', label: '-- Ignore Column --' },
+                { value: 'tower', label: 'Tower (A, B, C)' },
+                { value: 'flat', label: 'Flat Number' },
+                { value: 'inspector', label: 'Inspector Name' },
+                { value: 'start_date', label: 'Start Date' },
+                { value: 'end_date', label: 'End Date' },
+                { value: 'followup_date', label: 'Follow-up Date' },
+                { value: 'mep_completed', label: 'MEP Completed (YES/NO)' },
+                { value: 'civil_completed', label: 'Civil Completed (YES/NO)' },
+                { value: 'electrical_completed', label: 'Electrical Completed (YES/NO)' },
+                { value: 'water_completed', label: 'Water & Slopes Completed (YES/NO)' },
+                { value: 'ac_drain_completed', label: 'AC Drain Completed (YES/NO)' },
+                { value: 'tiles_completed', label: 'Tiles Completed (YES/NO)' },
+                { value: 'snag_remarks', label: 'Snag Remarks' }
+            ],
+            first_visit: [
+                { value: '', label: '-- Ignore Column --' },
+                { value: 'tower', label: 'Tower (A, B, C)' },
+                { value: 'flat', label: 'Flat Number' },
+                { value: 'owner_name', label: 'Owner Name' },
+                { value: 'owner_phone', label: 'Owner Phone' },
+                { value: 'visit_date', label: 'Visit Date & Time' },
+                { value: 'hot_member', label: 'HOT Team Member' },
+                { value: 'handover_suggested', label: 'Handover Date Suggested' },
+                { value: 'customer_remarks', label: 'Customer Remarks' },
+                { value: 'crm_noc', label: 'CRM NOC (YES/NO)' }
+            ],
+            handover: [
+                { value: '', label: '-- Ignore Column --' },
+                { value: 'tower', label: 'Tower (A, B, C)' },
+                { value: 'flat', label: 'Flat Number' },
+                { value: 'customer_name', label: 'Customer Name' },
+                { value: 'handover_date', label: 'Handover Date & Time' },
+                { value: 'hoto_member', label: 'HOTO Team Member' },
+                { value: 'keys_handed', label: 'All Keys Handed (YES/NO)' },
+                { value: 'manual_handed', label: 'Handover Book Handed (YES/NO)' },
+                { value: 'gift_box_handed', label: 'Gift Box Handed (YES/NO)' },
+                { value: 'customer_feedback', label: 'Customer Feedback' },
+                { value: 'completed', label: 'Completed (YES/NO)' }
+            ],
+            interiors: [
+                { value: '', label: '-- Ignore Column --' },
+                { value: 'tower', label: 'Tower (A, B, C)' },
+                { value: 'flat', label: 'Flat Number' },
+                { value: 'start_date', label: 'Start Date' },
+                { value: 'contractor_name', label: 'Contractor Name' },
+                { value: 'contractor_contact', label: 'Contractor Contact' },
+                { value: 'expected_end_date', label: 'Expected End Date' },
+                { value: 'clearance_by', label: 'Clearance By' },
+                { value: 'flooring', label: 'Flooring (YES/NO)' },
+                { value: 'painting', label: 'Painting (YES/NO)' },
+                { value: 'carpentry', label: 'Carpentry (YES/NO)' },
+                { value: 'electrical', label: 'Electrical (YES/NO)' },
+                { value: 'plumbing', label: 'Plumbing (YES/NO)' },
+                { value: 'false_ceiling', label: 'False Ceiling (YES/NO)' },
+                { value: 'interior_remarks', label: 'Remarks' }
+            ],
+            movein: [
+                { value: '', label: '-- Ignore Column --' },
+                { value: 'tower', label: 'Tower (A, B, C)' },
+                { value: 'flat', label: 'Flat Number' },
+                { value: 'customer_name', label: 'Customer Name' },
+                { value: 'movein_date', label: 'Move-in Date & Time' },
+                { value: 'contact_number', label: 'Contact Number' },
+                { value: 'movein_remarks', label: 'Remarks/Special Instructions' }
+            ]
+        };
+        
+        // Initialize
         document.addEventListener('DOMContentLoaded', function() {
             const uploadArea = document.getElementById('uploadArea');
             
@@ -290,7 +442,21 @@
                     handleFileSelect({ target: { files: files } });
                 }
             });
+            
+            // Initialize field options
+            fieldOptions = fieldOptionsData.key_handover;
         });
+        
+        // Update field options based on selected data type
+        function updateFieldOptions() {
+            const dataType = document.getElementById('dataType').value;
+            fieldOptions = fieldOptionsData[dataType] || fieldOptionsData.key_handover;
+            
+            // Regenerate mapping if already setup
+            if (excelData && excelData.length > 0) {
+                setupColumnMapping();
+            }
+        }
         
         // Handle file selection
         function handleFileSelect(event) {
@@ -410,24 +576,8 @@
             const mappingDiv = document.getElementById('columnMapping');
             const mappingCard = document.getElementById('mappingCard');
             
-            // Field options
-            const fieldOptions = [
-                { value: '', label: '-- Ignore Column --' },
-                { value: 'tower', label: 'Tower (A, B, C)' },
-                { value: 'flat', label: 'Flat Number' },
-                { value: 'handover_person', label: 'Handover Person' },
-                { value: 'handover_date', label: 'Handover Date' },
-                { value: 'incomplete_keys', label: 'Incomplete Keys' },
-                { value: 'key_remarks', label: 'Key Remarks' },
-                { value: 'snag_inspector', label: 'Snag Inspector' },
-                { value: 'snag_start_date', label: 'Snag Start Date' },
-                { value: 'snag_end_date', label: 'Snag End Date' },
-                { value: 'owner_name', label: 'Owner Name' },
-                { value: 'owner_phone', label: 'Owner Phone' },
-                { value: 'visit_date', label: 'Visit Date' },
-                { value: 'hot_member', label: 'HOT Team Member' },
-                { value: 'remarks', label: 'Remarks' }
-            ];
+            // Clear previous mapping
+            columnMapping = {};
             
             let html = '<h6>Map Excel Columns:</h6>';
             
@@ -493,6 +643,7 @@
         
         // Start import process
         function startImportProcess() {
+            const dataType = document.getElementById('dataType').value;
             const skipHeader = document.getElementById('skipFirstRow').checked;
             const startRow = skipHeader ? 1 : 0;
             const totalRows = excelData.length - startRow;
@@ -514,7 +665,7 @@
                 
                 // Process row
                 const row = excelData[i];
-                const rowData = {};
+                const rowData = { data_type: dataType };
                 
                 // Map columns
                 Object.keys(columnMapping).forEach(colIndex => {
@@ -568,22 +719,111 @@
                 
                 const flatId = `${rowData.tower}-${rowData.flat}`;
                 
-                // Determine data type based on available fields
-                if (rowData.handover_person) {
-                    // Key handover data
-                    if (!hotData.towers[rowData.tower].flats[flatId]) {
-                        hotData.towers[rowData.tower].flats[flatId] = {};
-                    }
-                    
-                    hotData.towers[rowData.tower].flats[flatId].keyHandover = {
-                        date: rowData.handover_date || new Date().toISOString().split('T')[0],
-                        person: rowData.handover_person,
-                        incompleteKeys: rowData.incomplete_keys === 'YES' || rowData.incomplete_keys === true,
-                        remarks: rowData.key_remarks || null,
-                        status: 'completed',
-                        imported: true,
-                        importDate: new Date().toISOString()
-                    };
+                // Initialize flat data if not exists
+                if (!hotData.towers[rowData.tower].flats[flatId]) {
+                    hotData.towers[rowData.tower].flats[flatId] = {};
+                }
+                
+                // Import based on data type
+                switch(rowData.data_type) {
+                    case 'key_handover':
+                        hotData.towers[rowData.tower].flats[flatId].keyHandover = {
+                            date: rowData.handover_date || new Date().toISOString().split('T')[0],
+                            person: rowData.handover_person || '',
+                            incompleteKeys: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.incomplete_keys).toUpperCase()),
+                            remarks: rowData.key_remarks || null,
+                            status: 'completed',
+                            imported: true,
+                            importDate: new Date().toISOString()
+                        };
+                        break;
+                        
+                    case 'snagging':
+                        hotData.towers[rowData.tower].flats[flatId].snagging = {
+                            startDate: rowData.start_date || new Date().toISOString().split('T')[0],
+                            endDate: rowData.end_date || null,
+                            inspector: rowData.inspector || '',
+                            categories: {
+                                mep: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.mep_completed).toUpperCase()),
+                                civil: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.civil_completed).toUpperCase()),
+                                electrical: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.electrical_completed).toUpperCase()),
+                                water: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.water_completed).toUpperCase()),
+                                acDrain: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.ac_drain_completed).toUpperCase()),
+                                tiles: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.tiles_completed).toUpperCase())
+                            },
+                            remarks: rowData.snag_remarks || null,
+                            followUpDate: rowData.followup_date || null,
+                            status: 'completed',
+                            imported: true,
+                            importDate: new Date().toISOString()
+                        };
+                        break;
+                        
+                    case 'first_visit':
+                        hotData.towers[rowData.tower].flats[flatId].firstVisit = {
+                            ownerName: rowData.owner_name || '',
+                            ownerPhone: rowData.owner_phone || '',
+                            visitDate: rowData.visit_date || new Date().toISOString(),
+                            hotMember: rowData.hot_member || '',
+                            remarks: rowData.customer_remarks || null,
+                            handoverDateSuggested: rowData.handover_suggested || null,
+                            crmNOC: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.crm_noc).toUpperCase()),
+                            status: 'completed',
+                            imported: true,
+                            importDate: new Date().toISOString()
+                        };
+                        break;
+                        
+                    case 'handover':
+                        hotData.towers[rowData.tower].flats[flatId].handover = {
+                            customer: rowData.customer_name || '',
+                            hotMember: rowData.hoto_member || '',
+                            date: rowData.handover_date || new Date().toISOString(),
+                            documents: {
+                                keys: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.keys_handed).toUpperCase()),
+                                manual: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.manual_handed).toUpperCase()),
+                                amc: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.gift_box_handed).toUpperCase())
+                            },
+                            feedback: rowData.customer_feedback || null,
+                            status: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.completed).toUpperCase()) ? 'completed' : 'pending',
+                            imported: true,
+                            importDate: new Date().toISOString()
+                        };
+                        break;
+                        
+                    case 'interiors':
+                        hotData.towers[rowData.tower].flats[flatId].interiors = {
+                            startDate: rowData.start_date || new Date().toISOString().split('T')[0],
+                            endDate: rowData.expected_end_date || null,
+                            contractor: rowData.contractor_name || '',
+                            contractorContact: rowData.contractor_contact || null,
+                            workTypes: {
+                                flooring: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.flooring).toUpperCase()),
+                                painting: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.painting).toUpperCase()),
+                                carpentry: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.carpentry).toUpperCase()),
+                                electrical: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.electrical).toUpperCase()),
+                                plumbing: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.plumbing).toUpperCase()),
+                                falseCeiling: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.false_ceiling).toUpperCase())
+                            },
+                            clearanceBy: rowData.clearance_by || null,
+                            remarks: rowData.interior_remarks || null,
+                            status: 'started',
+                            imported: true,
+                            importDate: new Date().toISOString()
+                        };
+                        break;
+                        
+                    case 'movein':
+                        hotData.towers[rowData.tower].flats[flatId].movein = {
+                            customer: rowData.customer_name || '',
+                            date: rowData.movein_date || new Date().toISOString(),
+                            contact: rowData.contact_number || null,
+                            remarks: rowData.movein_remarks || null,
+                            status: 'completed',
+                            imported: true,
+                            importDate: new Date().toISOString()
+                        };
+                        break;
                 }
                 
                 // Save to localStorage
@@ -591,7 +831,7 @@
                 
                 return {
                     success: true,
-                    message: `Imported data for Tower ${rowData.tower} - Flat ${rowData.flat}`
+                    message: `Imported ${rowData.data_type} for Tower ${rowData.tower} - Flat ${rowData.flat}`
                 };
                 
             } catch (error) {
@@ -618,27 +858,60 @@
                     templateData = [
                         ['Tower', 'Flat', 'Handover_Person', 'Handover_Date', 'Incomplete_Keys', 'Remarks'],
                         ['A', '1503', 'John Doe', '2023-10-15', 'NO', 'All keys received'],
-                        ['B', '2207', 'Jane Smith', '2023-10-16', 'YES', 'Missing main door key']
+                        ['B', '2207', 'Jane Smith', '2023-10-16', 'YES', 'Missing main door key'],
+                        ['C', '0905', 'Mike Johnson', '2023-10-17', 'NO', 'All keys handed over']
                     ];
                     filename = 'key_handover_template.xlsx';
                     break;
                     
                 case 'snagging':
                     templateData = [
-                        ['Tower', 'Flat', 'Inspector', 'Start_Date', 'End_Date', 'MEP', 'Civil', 'Electrical', 'Water', 'AC_Drain', 'Tiles', 'Remarks'],
-                        ['A', '1503', 'Mike Johnson', '2023-10-15', '2023-10-22', 'YES', 'YES', 'NO', 'YES', 'YES', 'YES', 'Electrical pending'],
-                        ['C', '0905', 'Sarah Wilson', '2023-10-16', '2023-10-23', 'YES', 'NO', 'YES', 'YES', 'YES', 'NO', 'Civil work needed']
+                        ['Tower', 'Flat', 'Inspector', 'Start_Date', 'End_Date', 'Followup_Date', 'MEP_Completed', 'Civil_Completed', 'Electrical_Completed', 'Water_Completed', 'AC_Drain_Completed', 'Tiles_Completed', 'Remarks'],
+                        ['A', '1503', 'Mike Johnson', '2023-10-15', '2023-10-22', '2023-10-25', 'YES', 'YES', 'NO', 'YES', 'YES', 'YES', 'Electrical pending'],
+                        ['C', '0905', 'Sarah Wilson', '2023-10-16', '2023-10-23', '2023-10-26', 'YES', 'NO', 'YES', 'YES', 'YES', 'NO', 'Civil work needed'],
+                        ['B', '2207', 'Alex Chen', '2023-10-17', '2023-10-24', '2023-10-27', 'YES', 'YES', 'YES', 'YES', 'NO', 'YES', 'AC drain issues']
                     ];
                     filename = 'snagging_template.xlsx';
                     break;
                     
                 case 'first_visit':
                     templateData = [
-                        ['Tower', 'Flat', 'Owner_Name', 'Owner_Phone', 'Visit_Date', 'HOT_Member', 'Handover_Date_Suggested', 'Remarks'],
-                        ['B', '2207', 'Robert Brown', '9876543210', '2023-10-20 14:30', 'Alex Chen', '2023-10-25 10:00', 'Customer satisfied'],
-                        ['A', '1806', 'Emily Davis', '8765432109', '2023-10-21 11:00', 'Sam Wilson', '', 'Rescue flat - special handling']
+                        ['Tower', 'Flat', 'Owner_Name', 'Owner_Phone', 'Visit_Date', 'HOT_Member', 'Handover_Suggested', 'Customer_Remarks', 'CRM_NOC'],
+                        ['B', '2207', 'Robert Brown', '9876543210', '2023-10-20 14:30', 'Alex Chen', '2023-10-25 10:00', 'Customer satisfied', 'YES'],
+                        ['A', '1806', 'Emily Davis', '8765432109', '2023-10-21 11:00', 'Sam Wilson', '', 'Rescue flat - special handling', 'NO'],
+                        ['C', '0905', 'David Wilson', '7654321098', '2023-10-22 15:00', 'Lisa Wang', '2023-10-28 09:30', 'Minor issues noted', 'YES']
                     ];
                     filename = 'first_visit_template.xlsx';
+                    break;
+                    
+                case 'handover':
+                    templateData = [
+                        ['Tower', 'Flat', 'Customer_Name', 'Handover_Date', 'HOTO_Member', 'Keys_Handed', 'Manual_Handed', 'Gift_Box_Handed', 'Customer_Feedback', 'Completed'],
+                        ['A', '1503', 'Robert Brown', '2023-10-25 10:00', 'Alex Chen', 'YES', 'YES', 'YES', 'Very satisfied with the handover process', 'YES'],
+                        ['B', '2207', 'Emily Davis', '2023-10-26 11:00', 'Sam Wilson', 'YES', 'YES', 'NO', 'Gift box to be delivered next week', 'NO'],
+                        ['C', '0905', 'David Wilson', '2023-10-28 09:30', 'Lisa Wang', 'YES', 'YES', 'YES', 'All documents received', 'YES']
+                    ];
+                    filename = 'handover_template.xlsx';
+                    break;
+                    
+                case 'interiors':
+                    templateData = [
+                        ['Tower', 'Flat', 'Start_Date', 'Contractor_Name', 'Contractor_Contact', 'Expected_End_Date', 'Clearance_By', 'Flooring', 'Painting', 'Carpentry', 'Electrical', 'Plumbing', 'False_Ceiling', 'Remarks'],
+                        ['A', '1503', '2023-10-30', 'Elite Interiors', '9876543210', '2023-11-30', 'Alex Chen', 'YES', 'YES', 'YES', 'NO', 'YES', 'NO', 'Electrical work will be done separately'],
+                        ['B', '2207', '2023-11-01', 'Premium Designs', '8765432109', '2023-12-15', 'Sam Wilson', 'YES', 'YES', 'YES', 'YES', 'YES', 'YES', 'Complete renovation'],
+                        ['C', '0905', '2023-11-05', 'Modern Interiors', '7654321098', '2023-12-10', 'Lisa Wang', 'NO', 'YES', 'NO', 'YES', 'NO', 'YES', 'Only painting and electrical work']
+                    ];
+                    filename = 'interior_work_template.xlsx';
+                    break;
+                    
+                case 'movein':
+                    templateData = [
+                        ['Tower', 'Flat', 'Customer_Name', 'Movein_Date', 'Contact_Number', 'Remarks'],
+                        ['A', '1503', 'Robert Brown', '2023-12-01 10:00', '9876543210', 'All furniture moved in'],
+                        ['B', '2207', 'Emily Davis', '2023-12-20 14:00', '8765432109', 'Rescue flat - special arrangements made'],
+                        ['C', '0905', 'David Wilson', '2023-12-15 09:00', '7654321098', 'Early morning move-in requested']
+                    ];
+                    filename = 'movein_template.xlsx';
                     break;
             }
             
