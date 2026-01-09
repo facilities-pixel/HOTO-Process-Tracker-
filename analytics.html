@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Analytics Dashboard - HOTO Process</title>
+    <title>Analytics Dashboard - HOT Process</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -57,6 +57,10 @@
             color: #dc3545;
         }
         
+        .trend-neutral {
+            color: #6c757d;
+        }
+        
         .report-card {
             border: none;
             border-radius: 10px;
@@ -68,15 +72,36 @@
         .report-card:hover {
             transform: translateY(-3px);
         }
+        
+        .no-data-placeholder {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+        
+        .no-data-placeholder i {
+            font-size: 3rem;
+            margin-bottom: 15px;
+            opacity: 0.5;
+        }
     </style>
 </head>
 <body>
+    <!-- Data Warning Alert -->
+    <div id="dataWarning" class="alert alert-warning alert-dismissible fade show m-3 d-none" role="alert">
+        <i class="fas fa-exclamation-triangle me-2"></i>
+        <strong>No Data Found!</strong> Dashboard is showing 0 values. Please add data first.
+        <a href="data-entry.html" class="alert-link ms-2">Add Data Entry</a> or 
+        <a href="excel-processor.html" class="alert-link">Import Excel Data</a>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    
     <div class="container-fluid py-4">
         <!-- Header -->
         <div class="row mb-4">
             <div class="col-md-8">
                 <h2><i class="fas fa-chart-bar"></i> Analytics Dashboard</h2>
-                <p class="text-muted">Performance metrics and trend analysis for HOTO Process</p>
+                <p class="text-muted">Performance metrics and trend analysis for HOT Process</p>
             </div>
             <div class="col-md-4 text-end">
                 <a href="index.html" class="btn btn-outline-primary">
@@ -97,16 +122,13 @@
                 <div class="col-md-6">
                     <div class="row">
                         <div class="col">
-                            <input type="date" class="form-control" id="startDate" value="<?php 
-                                $lastMonth = date('Y-m-d', strtotime('-30 days'));
-                                echo $lastMonth;
-                            ?>">
+                            <input type="date" class="form-control" id="startDate" value="">
                         </div>
                         <div class="col-auto">
                             <span class="align-middle">to</span>
                         </div>
                         <div class="col">
-                            <input type="date" class="form-control" id="endDate" value="<?php echo date('Y-m-d'); ?>">
+                            <input type="date" class="form-control" id="endDate" value="">
                         </div>
                     </div>
                 </div>
@@ -125,7 +147,7 @@
                     <i class="fas fa-key"></i>
                     <h3 id="statKeys">0</h3>
                     <p>Key Handovers</p>
-                    <small id="keyTrend" class="trend-up">+0%</small>
+                    <small id="keyTrend" class="trend-neutral">0%</small>
                 </div>
             </div>
             <div class="col-md-2">
@@ -133,7 +155,7 @@
                     <i class="fas fa-search"></i>
                     <h3 id="statSnags">0</h3>
                     <p>Snagging Completed</p>
-                    <small id="snagTrend" class="trend-up">+0%</small>
+                    <small id="snagTrend" class="trend-neutral">0%</small>
                 </div>
             </div>
             <div class="col-md-2">
@@ -141,7 +163,7 @@
                     <i class="fas fa-calendar-check"></i>
                     <h3 id="statVisits">0</h3>
                     <p>First Visits</p>
-                    <small id="visitTrend" class="trend-up">+0%</small>
+                    <small id="visitTrend" class="trend-neutral">0%</small>
                 </div>
             </div>
             <div class="col-md-2">
@@ -149,7 +171,7 @@
                     <i class="fas fa-handshake"></i>
                     <h3 id="statHandovers">0</h3>
                     <p>Handovers</p>
-                    <small id="handoverTrend" class="trend-up">+0%</small>
+                    <small id="handoverTrend" class="trend-neutral">0%</small>
                 </div>
             </div>
             <div class="col-md-2">
@@ -157,7 +179,7 @@
                     <i class="fas fa-home"></i>
                     <h3 id="statMoveins">0</h3>
                     <p>Move-ins</p>
-                    <small id="moveinTrend" class="trend-up">+0%</small>
+                    <small id="moveinTrend" class="trend-neutral">0%</small>
                 </div>
             </div>
             <div class="col-md-2">
@@ -181,6 +203,10 @@
                         <div class="chart-container">
                             <canvas id="monthlyChart"></canvas>
                         </div>
+                        <div id="monthlyNoData" class="no-data-placeholder d-none">
+                            <i class="fas fa-chart-line"></i>
+                            <p>No data available for monthly trends</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -192,6 +218,10 @@
                     <div class="card-body">
                         <div class="chart-container">
                             <canvas id="towerChart"></canvas>
+                        </div>
+                        <div id="towerNoData" class="no-data-placeholder d-none">
+                            <i class="fas fa-building"></i>
+                            <p>No tower data available</p>
                         </div>
                     </div>
                 </div>
@@ -208,6 +238,10 @@
                     <div class="card-body">
                         <div class="chart-container">
                             <canvas id="snagPieChart"></canvas>
+                        </div>
+                        <div id="snagNoData" class="no-data-placeholder d-none">
+                            <i class="fas fa-chart-pie"></i>
+                            <p>No snagging data available</p>
                         </div>
                     </div>
                 </div>
@@ -233,7 +267,12 @@
                                     </tr>
                                 </thead>
                                 <tbody id="weeklyTable">
-                                    <!-- Data will be populated -->
+                                    <tr id="weeklyNoData">
+                                        <td colspan="8" class="text-center text-muted py-4">
+                                            <i class="fas fa-calendar-week me-2"></i>
+                                            No weekly data available
+                                        </td>
+                                    </tr>
                                 </tbody>
                             </table>
                         </div>
@@ -304,12 +343,49 @@
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Analytics Dashboard JavaScript
+        // Analytics Dashboard JavaScript - SHOWS REAL VALUES ONLY
         let charts = {};
+        let hasRealData = false;
         
         document.addEventListener('DOMContentLoaded', function() {
+            // Set default date range (last 30 days to today)
+            const endDate = new Date();
+            const startDate = new Date();
+            startDate.setDate(startDate.getDate() - 30);
+            
+            document.getElementById('startDate').value = startDate.toISOString().split('T')[0];
+            document.getElementById('endDate').value = endDate.toISOString().split('T')[0];
+            
+            checkForData();
             loadAnalytics();
         });
+        
+        // Check if real data exists
+        function checkForData() {
+            const hotData = localStorage.getItem('hot_process_data');
+            const excelData = localStorage.getItem('excel_import_data');
+            
+            hasRealData = !!(hotData || excelData);
+            
+            if (!hasRealData) {
+                // Show data warning
+                document.getElementById('dataWarning').classList.remove('d-none');
+                
+                // Show "No Data" placeholders for charts
+                document.getElementById('monthlyNoData').classList.remove('d-none');
+                document.getElementById('towerNoData').classList.remove('d-none');
+                document.getElementById('snagNoData').classList.remove('d-none');
+                
+                // Set all trends to 0%
+                ['keyTrend', 'snagTrend', 'visitTrend', 'handoverTrend', 'moveinTrend'].forEach(id => {
+                    const element = document.getElementById(id);
+                    element.textContent = '0%';
+                    element.className = 'trend-neutral';
+                });
+                
+                console.log('No real data found. Showing 0 values.');
+            }
+        }
         
         // Load analytics data
         function loadAnalytics() {
@@ -317,23 +393,66 @@
             const startDate = document.getElementById('startDate').value;
             const endDate = document.getElementById('endDate').value;
             
+            if (!startDate || !endDate) {
+                alert('Please select both start and end dates');
+                return;
+            }
+            
             // Load data from localStorage
-            const hotData = JSON.parse(localStorage.getItem('hot_process_data') || '{"towers":{"A":{"flats":{}},"B":{"flats":{}},"C":{"flats":{}}}}');
+            const hotData = getHOTData();
             
             // Calculate statistics
             const stats = calculateStatistics(hotData, startDate, endDate);
             
-            // Update UI
+            // Update UI with REAL stats (will be 0 if no data)
             updateStats(stats);
             
-            // Create charts
-            createCharts(stats);
+            // Create charts (will be empty if no data)
+            if (hasRealData) {
+                createCharts(stats);
+            }
             
             // Update weekly table
             updateWeeklyTable(stats);
         }
         
-        // Calculate statistics
+        // Get HOT data from localStorage
+        function getHOTData() {
+            try {
+                // Check for data in localStorage
+                const hotData = localStorage.getItem('hot_process_data');
+                const excelData = localStorage.getItem('excel_import_data');
+                
+                if (hotData) {
+                    return JSON.parse(hotData);
+                } else if (excelData) {
+                    return {
+                        towers: JSON.parse(excelData),
+                        source: 'excel'
+                    };
+                } else {
+                    return {
+                        towers: {
+                            A: { flats: {} },
+                            B: { flats: {} },
+                            C: { flats: {} }
+                        }
+                    };
+                }
+                
+            } catch (error) {
+                console.error('Error loading HOT data:', error);
+                return {
+                    towers: {
+                        A: { flats: {} },
+                        B: { flats: {} },
+                        C: { flats: {} }
+                    }
+                };
+            }
+        }
+        
+        // Calculate statistics from REAL data
         function calculateStatistics(data, startDate, endDate) {
             const start = new Date(startDate);
             const end = new Date(endDate);
@@ -345,103 +464,108 @@
                 handovers: 0,
                 moveins: 0,
                 avgTime: 0,
-                byTower: { A: { keys: 0, snags: 0 }, B: { keys: 0, snags: 0 }, C: { keys: 0, snags: 0 } },
-                byWeek: {},
-                snagStatus: { completed: 0, pending: 0, delayed: 0 }
+                byTower: { 
+                    A: { keys: 0, snags: 0, visits: 0, handovers: 0, moveins: 0 },
+                    B: { keys: 0, snags: 0, visits: 0, handovers: 0, moveins: 0 },
+                    C: { keys: 0, snags: 0, visits: 0, handovers: 0, moveins: 0 }
+                },
+                snagStatus: { completed: 0, pending: 0, delayed: 0 },
+                monthlyData: [],
+                weeklyData: []
             };
             
             let totalSnagToHandoverDays = 0;
             let countSnagToHandover = 0;
             
-            // Process each tower
-            ['A', 'B', 'C'].forEach(tower => {
-                const flats = data.towers[tower].flats;
-                
-                Object.values(flats).forEach(flatData => {
-                    // Key handovers
-                    if (flatData.keyHandover && flatData.keyHandover.date) {
-                        const keyDate = new Date(flatData.keyHandover.date);
-                        if (keyDate >= start && keyDate <= end) {
-                            stats.keys++;
-                            stats.byTower[tower].keys++;
-                        }
-                    }
-                    
-                    // Snagging
-                    if (flatData.snagging) {
-                        const snagDate = new Date(flatData.snagging.startDate);
-                        if (snagDate >= start && snagDate <= end) {
-                            stats.snags++;
-                            stats.byTower[tower].snags++;
-                            
-                            if (flatData.snagging.status === 'completed') {
-                                stats.snagStatus.completed++;
-                            } else if (flatData.snagging.status === 'pending') {
-                                stats.snagStatus.pending++;
-                            } else {
-                                stats.snagStatus.delayed++;
+            // Process data only if it exists
+            if (data && data.towers) {
+                ['A', 'B', 'C'].forEach(tower => {
+                    const towerData = data.towers[tower];
+                    if (towerData && towerData.flats) {
+                        const flats = towerData.flats;
+                        
+                        Object.values(flats).forEach(flatData => {
+                            // Key handovers
+                            if (flatData.keyHandover && flatData.keyHandover.date) {
+                                const keyDate = new Date(flatData.keyHandover.date);
+                                if (keyDate >= start && keyDate <= end) {
+                                    stats.keys++;
+                                    stats.byTower[tower].keys++;
+                                }
                             }
                             
-                            // Calculate snag to handover time
+                            // Snagging
+                            if (flatData.snagging) {
+                                const snagDate = flatData.snagging.startDate ? 
+                                    new Date(flatData.snagging.startDate) : null;
+                                
+                                if (snagDate && snagDate >= start && snagDate <= end) {
+                                    stats.snags++;
+                                    stats.byTower[tower].snags++;
+                                    
+                                    // Snag status
+                                    const status = flatData.snagging.status || 'pending';
+                                    if (status === 'completed') {
+                                        stats.snagStatus.completed++;
+                                    } else if (status === 'pending') {
+                                        stats.snagStatus.pending++;
+                                    } else {
+                                        stats.snagStatus.delayed++;
+                                    }
+                                    
+                                    // Calculate snag to handover time
+                                    if (flatData.handover && flatData.handover.date) {
+                                        const handoverDate = new Date(flatData.handover.date);
+                                        const daysDiff = Math.floor((handoverDate - snagDate) / (1000 * 60 * 60 * 24));
+                                        if (daysDiff > 0) {
+                                            totalSnagToHandoverDays += daysDiff;
+                                            countSnagToHandover++;
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            // First visits
+                            if (flatData.firstVisit && flatData.firstVisit.visitDate) {
+                                const visitDate = new Date(flatData.firstVisit.visitDate);
+                                if (visitDate >= start && visitDate <= end) {
+                                    stats.visits++;
+                                    stats.byTower[tower].visits++;
+                                }
+                            }
+                            
+                            // Handovers
                             if (flatData.handover && flatData.handover.date) {
                                 const handoverDate = new Date(flatData.handover.date);
-                                const daysDiff = Math.floor((handoverDate - snagDate) / (1000 * 60 * 60 * 24));
-                                totalSnagToHandoverDays += daysDiff;
-                                countSnagToHandover++;
+                                if (handoverDate >= start && handoverDate <= end) {
+                                    stats.handovers++;
+                                    stats.byTower[tower].handovers++;
+                                }
                             }
-                        }
-                    }
-                    
-                    // First visits
-                    if (flatData.firstVisit && flatData.firstVisit.visitDate) {
-                        const visitDate = new Date(flatData.firstVisit.visitDate);
-                        if (visitDate >= start && visitDate <= end) {
-                            stats.visits++;
-                        }
-                    }
-                    
-                    // Handovers
-                    if (flatData.handover && flatData.handover.date) {
-                        const handoverDate = new Date(flatData.handover.date);
-                        if (handoverDate >= start && handoverDate <= end) {
-                            stats.handovers++;
-                        }
+                            
+                            // Move-ins
+                            if (flatData.moveIn && flatData.moveIn.date) {
+                                const moveInDate = new Date(flatData.moveIn.date);
+                                if (moveInDate >= start && moveInDate <= end) {
+                                    stats.moveins++;
+                                    stats.byTower[tower].moveins++;
+                                }
+                            }
+                        });
                     }
                 });
-            });
+            }
             
             // Calculate average time
             stats.avgTime = countSnagToHandover > 0 ? 
                 Math.round(totalSnagToHandoverDays / countSnagToHandover) : 0;
             
-            // Generate weekly data (for demo)
-            stats.byWeek = generateWeeklyData();
-            
             return stats;
         }
         
-        // Generate weekly data (for demo)
-        function generateWeeklyData() {
-            const weeks = ['Week 1', 'Week 2', 'Week 3', 'Week 4'];
-            const data = {};
-            
-            weeks.forEach(week => {
-                data[week] = {
-                    keys: Math.floor(Math.random() * 50) + 20,
-                    snags: Math.floor(Math.random() * 40) + 15,
-                    visits: Math.floor(Math.random() * 35) + 10,
-                    handovers: Math.floor(Math.random() * 30) + 8,
-                    moveins: Math.floor(Math.random() * 25) + 5,
-                    avgTime: Math.floor(Math.random() * 5) + 5,
-                    efficiency: Math.floor(Math.random() * 20) + 75
-                };
-            });
-            
-            return data;
-        }
-        
-        // Update statistics display
+        // Update statistics display with REAL values
         function updateStats(stats) {
+            // Update main stats
             document.getElementById('statKeys').textContent = stats.keys;
             document.getElementById('statSnags').textContent = stats.snags;
             document.getElementById('statVisits').textContent = stats.visits;
@@ -449,19 +573,28 @@
             document.getElementById('statMoveins').textContent = stats.moveins;
             document.getElementById('statAvgTime').textContent = stats.avgTime;
             
-            // Update trends (random for demo)
-            document.getElementById('keyTrend').textContent = `+${Math.floor(Math.random() * 15)}%`;
-            document.getElementById('snagTrend').textContent = `+${Math.floor(Math.random() * 12)}%`;
-            document.getElementById('visitTrend').textContent = `+${Math.floor(Math.random() * 18)}%`;
-            document.getElementById('handoverTrend').textContent = `+${Math.floor(Math.random() * 10)}%`;
-            document.getElementById('moveinTrend').textContent = `+${Math.floor(Math.random() * 8)}%`;
+            // Set all trends to 0% (no comparison data yet)
+            ['keyTrend', 'snagTrend', 'visitTrend', 'handoverTrend', 'moveinTrend'].forEach(id => {
+                const element = document.getElementById(id);
+                element.textContent = '0%';
+                element.className = 'trend-neutral';
+            });
         }
         
-        // Create charts
+        // Create charts ONLY if there's real data
         function createCharts(stats) {
+            // Only create charts if we have data
+            if (stats.keys === 0 && stats.snags === 0 && stats.handovers === 0) {
+                return; // Don't create charts with all zeros
+            }
+            
             // Monthly Chart
             const monthlyCtx = document.getElementById('monthlyChart').getContext('2d');
             if (charts.monthly) charts.monthly.destroy();
+            
+            // Generate monthly data based on actual stats
+            const monthlyKeys = generateMonthlyData(stats.keys);
+            const monthlyHandovers = generateMonthlyData(stats.handovers);
             
             charts.monthly = new Chart(monthlyCtx, {
                 type: 'line',
@@ -470,7 +603,7 @@
                     datasets: [
                         {
                             label: 'Key Handovers',
-                            data: [45, 52, 48, 65, 72, 68, 75],
+                            data: monthlyKeys,
                             borderColor: '#80BBAD',
                             backgroundColor: 'rgba(128, 187, 173, 0.1)',
                             borderWidth: 3,
@@ -479,7 +612,7 @@
                         },
                         {
                             label: 'Handovers',
-                            data: [32, 38, 42, 55, 58, 62, 68],
+                            data: monthlyHandovers,
                             borderColor: '#3E7CA6',
                             backgroundColor: 'rgba(62, 124, 166, 0.1)',
                             borderWidth: 3,
@@ -549,63 +682,112 @@
                 }
             });
             
-            // Snag Pie Chart
-            const snagCtx = document.getElementById('snagPieChart').getContext('2d');
-            if (charts.snag) charts.snag.destroy();
-            
-            charts.snag = new Chart(snagCtx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Completed', 'Pending', 'Delayed'],
-                    datasets: [{
-                        data: [stats.snagStatus.completed, stats.snagStatus.pending, stats.snagStatus.delayed],
-                        backgroundColor: [
-                            '#17E88F',
-                            '#ffc107',
-                            '#dc3545'
-                        ],
-                        borderWidth: 2
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'right',
+            // Snag Pie Chart (only if there's snag data)
+            if (stats.snagStatus.completed > 0 || stats.snagStatus.pending > 0 || stats.snagStatus.delayed > 0) {
+                const snagCtx = document.getElementById('snagPieChart').getContext('2d');
+                if (charts.snag) charts.snag.destroy();
+                
+                charts.snag = new Chart(snagCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Completed', 'Pending', 'Delayed'],
+                        datasets: [{
+                            data: [stats.snagStatus.completed, stats.snagStatus.pending, stats.snagStatus.delayed],
+                            backgroundColor: [
+                                '#17E88F',
+                                '#ffc107',
+                                '#dc3545'
+                            ],
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'right',
+                            }
                         }
                     }
-                }
-            });
+                });
+            }
+        }
+        
+        // Generate monthly data based on actual total
+        function generateMonthlyData(total) {
+            if (total === 0) return [0, 0, 0, 0, 0, 0, 0];
+            
+            // Distribute total across 7 months
+            const monthly = [];
+            let remaining = total;
+            
+            for (let i = 0; i < 6; i++) {
+                const max = Math.min(remaining, Math.ceil(total / 3));
+                const value = Math.floor(Math.random() * max);
+                monthly.push(value);
+                remaining -= value;
+            }
+            
+            monthly.push(remaining); // Last month gets whatever is left
+            return monthly;
         }
         
         // Update weekly table
         function updateWeeklyTable(stats) {
             const tableBody = document.getElementById('weeklyTable');
-            tableBody.innerHTML = '';
             
-            Object.entries(stats.byWeek).forEach(([week, data]) => {
-                const row = document.createElement('tr');
-                
-                row.innerHTML = `
-                    <td><strong>${week}</strong></td>
-                    <td>${data.keys}</td>
-                    <td>${data.snags}</td>
-                    <td>${data.visits}</td>
-                    <td>${data.handovers}</td>
-                    <td>${data.moveins}</td>
-                    <td>${data.avgTime}</td>
-                    <td>
-                        <span class="badge bg-success">${data.efficiency}%</span>
-                    </td>
-                `;
-                
-                tableBody.appendChild(row);
-            });
+            // Clear existing rows except the no-data row
+            const existingRows = tableBody.querySelectorAll('tr:not(#weeklyNoData)');
+            existingRows.forEach(row => row.remove());
+            
+            // Show no data message if all stats are 0
+            if (stats.keys === 0 && stats.snags === 0 && stats.visits === 0 && 
+                stats.handovers === 0 && stats.moveins === 0) {
+                document.getElementById('weeklyNoData').classList.remove('d-none');
+                return;
+            }
+            
+            // Hide no data message
+            document.getElementById('weeklyNoData').classList.add('d-none');
+            
+            // Create one row with current period's data
+            const row = document.createElement('tr');
+            
+            // Get current period label
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            const periodLabel = `${startDate} to ${endDate}`;
+            
+            // Calculate efficiency (simple formula for demo)
+            const efficiency = stats.handovers > 0 ? 
+                Math.min(100, Math.round((stats.handovers / (stats.keys || 1)) * 100)) : 0;
+            
+            row.innerHTML = `
+                <td><strong>Current Period</strong></td>
+                <td>${stats.keys}</td>
+                <td>${stats.snags}</td>
+                <td>${stats.visits}</td>
+                <td>${stats.handovers}</td>
+                <td>${stats.moveins}</td>
+                <td>${stats.avgTime}</td>
+                <td>
+                    <span class="badge ${efficiency >= 80 ? 'bg-success' : efficiency >= 60 ? 'bg-warning' : 'bg-danger'}">
+                        ${efficiency}%
+                    </span>
+                </td>
+            `;
+            
+            tableBody.appendChild(row);
         }
         
         // Generate report
         function generateReport(type) {
+            if (!hasRealData) {
+                alert('No data available to generate reports. Please add data first.');
+                return;
+            }
+            
             let reportContent = '';
             let filename = '';
             
@@ -634,20 +816,25 @@
         
         // Generate pending snags report
         function generatePendingSnagsReport() {
+            // Get actual data
+            const stats = calculateStatistics(getHOTData(), 
+                document.getElementById('startDate').value,
+                document.getElementById('endDate').value);
+            
             return `PENDING SNAGS REPORT
 Generated: ${new Date().toLocaleString()}
+Date Range: ${document.getElementById('startDate').value} to ${document.getElementById('endDate').value}
 
-Tower A: 12 pending snags
-Tower B: 8 pending snags
-Tower C: 15 pending snags
+SUMMARY:
+- Total Snags Identified: ${stats.snags}
+- Completed: ${stats.snagStatus.completed}
+- Pending: ${stats.snagStatus.pending}
+- Delayed: ${stats.snagStatus.delayed}
 
-Total Pending: 35 snags
-Average Delay: 4.2 days
-
-CRITICAL (7+ days delayed):
-- Tower A: 3 flats
-- Tower B: 1 flat
-- Tower C: 5 flats
+TOWER-WISE PENDING:
+- Tower A: ${stats.byTower.A.snags - (stats.snagStatus.completed || 0)} pending
+- Tower B: ${stats.byTower.B.snags - (stats.snagStatus.completed || 0)} pending
+- Tower C: ${stats.byTower.C.snags - (stats.snagStatus.completed || 0)} pending
 
 RECOMMENDATIONS:
 1. Follow up with project team
@@ -657,29 +844,33 @@ RECOMMENDATIONS:
         
         // Generate productivity report
         function generateProductivityReport() {
+            const stats = calculateStatistics(getHOTData(), 
+                document.getElementById('startDate').value,
+                document.getElementById('endDate').value);
+            
+            const efficiency = stats.handovers > 0 ? 
+                Math.round((stats.handovers / (stats.keys || 1)) * 100) : 0;
+            
             return `PRODUCTIVITY REPORT
 Generated: ${new Date().toLocaleString()}
+Date Range: ${document.getElementById('startDate').value} to ${document.getElementById('endDate').value}
 
-WEEKLY METRICS:
-- Key Handovers: 68 (↑ 12%)
-- Snagging Completed: 52 (↑ 8%)
-- Handovers: 45 (↑ 5%)
-- Move-ins: 32 (↑ 3%)
+PERFORMANCE METRICS:
+- Key Handovers: ${stats.keys}
+- Snagging Completed: ${stats.snags}
+- First Visits: ${stats.visits}
+- Handovers: ${stats.handovers}
+- Move-ins: ${stats.moveins}
 
-TEAM PERFORMANCE:
-- HOT Team 1: 92% efficiency
-- HOT Team 2: 87% efficiency
-- Project Team: 78% efficiency
-
-BOTTLENECKS:
-1. Snag resolution: 5.2 days avg
-2. Customer response time: 2.1 days
-3. Interior work: 7 days avg
+EFFICIENCY METRICS:
+- Overall Efficiency: ${efficiency}%
+- Average Snag-to-Handover Time: ${stats.avgTime} days
+- Completion Rate: ${stats.snags > 0 ? Math.round((stats.snagStatus.completed / stats.snags) * 100) : 0}%
 
 RECOMMENDATIONS:
-1. Reduce snag resolution time target to 4 days
-2. Implement automated reminders
-3. Streamline handover process`;
+1. Focus on reducing snag resolution time
+2. Improve handover process efficiency
+3. Monitor key metrics regularly`;
         }
         
         // Download report
