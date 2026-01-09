@@ -23,25 +23,36 @@
             border-left: 4px solid var(--cbre-blue);
             padding-left: 15px;
             margin-bottom: 30px;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
         }
         
         .step-header {
             display: flex;
             align-items: center;
-            margin-bottom: 15px;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #f0f0f0;
         }
         
         .step-number {
             background: var(--cbre-blue);
             color: white;
-            width: 30px;
-            height: 30px;
+            width: 35px;
+            height: 35px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin-right: 10px;
+            margin-right: 15px;
             font-weight: bold;
+            font-size: 1.2rem;
+        }
+        
+        .step-content {
+            padding: 15px 0;
         }
         
         .flat-grid {
@@ -52,12 +63,13 @@
         }
         
         .flat-cell {
-            padding: 8px;
+            padding: 10px;
             text-align: center;
             border: 1px solid #dee2e6;
             border-radius: 4px;
             cursor: pointer;
             transition: all 0.2s;
+            font-weight: 500;
         }
         
         .flat-cell:hover {
@@ -74,6 +86,7 @@
         .flat-cell.rescue {
             background-color: #fff3cd;
             border-color: #ffc107;
+            font-weight: bold;
         }
         
         .floor-buttons {
@@ -89,6 +102,11 @@
             background: white;
             border-radius: 4px;
             cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .floor-btn:hover {
+            background-color: #f8f9fa;
         }
         
         .floor-btn.active {
@@ -127,6 +145,56 @@
             content: " *";
             color: #dc3545;
         }
+        
+        .process-nav {
+            position: sticky;
+            top: 0;
+            background: white;
+            z-index: 100;
+            padding: 15px;
+            border-bottom: 2px solid #f0f0f0;
+            margin-bottom: 20px;
+        }
+        
+        .process-nav-items {
+            display: flex;
+            gap: 10px;
+            overflow-x: auto;
+            padding: 10px 0;
+        }
+        
+        .nav-step {
+            padding: 8px 15px;
+            border-radius: 20px;
+            background: #f8f9fa;
+            border: 2px solid #dee2e6;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s;
+        }
+        
+        .nav-step:hover {
+            border-color: var(--cbre-light-blue);
+        }
+        
+        .nav-step.active {
+            background: var(--cbre-blue);
+            color: white;
+            border-color: var(--cbre-blue);
+        }
+        
+        .nav-step.completed {
+            background: var(--cbre-green);
+            color: white;
+            border-color: var(--cbre-green);
+        }
+        
+        .section-title {
+            color: var(--cbre-blue);
+            margin: 20px 0 15px 0;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #e0e0e0;
+        }
     </style>
 </head>
 <body>
@@ -147,32 +215,32 @@
                             </h6>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link active" href="#step1">
+                            <a class="nav-link" href="#step1" onclick="showStep(1)">
                                 <i class="fas fa-key me-2"></i> Key Handover
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="#step2">
+                            <a class="nav-link" href="#step2" onclick="showStep(2)">
                                 <i class="fas fa-search me-2"></i> Snagging
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="#step3">
+                            <a class="nav-link" href="#step3" onclick="showStep(3)">
                                 <i class="fas fa-calendar-check me-2"></i> First Visit
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="#step4">
+                            <a class="nav-link" href="#step4" onclick="showStep(4)">
                                 <i class="fas fa-handshake me-2"></i> Handover
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="#step5">
+                            <a class="nav-link" href="#step5" onclick="showStep(5)">
                                 <i class="fas fa-hammer me-2"></i> Interiors
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="#step6">
+                            <a class="nav-link" href="#step6" onclick="showStep(6)">
                                 <i class="fas fa-home me-2"></i> Move-in
                             </a>
                         </li>
@@ -197,244 +265,527 @@
                             </div>
                         </div>
                     </div>
+                    
+                    <div class="px-3 mt-3">
+                        <button class="btn btn-outline-primary btn-sm w-100 mb-2" onclick="saveAllData()">
+                            <i class="fas fa-save"></i> Save All
+                        </button>
+                        <button class="btn btn-primary btn-sm w-100" onclick="syncData()">
+                            <i class="fas fa-cloud-upload-alt"></i> Sync to Cloud
+                        </button>
+                    </div>
                 </div>
             </div>
             
             <!-- Main Content -->
             <div class="col-md-9 col-lg-10 ml-sm-auto px-md-4 py-4">
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <div>
-                        <h2>HOT Process Data Entry</h2>
-                        <p class="text-muted mb-0">Complete process tracking for Towers A, B, C</p>
-                    </div>
-                    <div>
-                        <button class="btn btn-outline-primary me-2" onclick="saveAllData()">
-                            <i class="fas fa-save"></i> Save All
-                        </button>
-                        <button class="btn btn-primary" onclick="syncData()">
-                            <i class="fas fa-cloud-upload-alt"></i> Sync to Cloud
-                        </button>
+                <!-- Process Navigation -->
+                <div class="process-nav">
+                    <div class="process-nav-items">
+                        <div class="nav-step active" onclick="showStep(1)">
+                            <i class="fas fa-key me-1"></i> Key Handover
+                        </div>
+                        <div class="nav-step" onclick="showStep(2)">
+                            <i class="fas fa-search me-1"></i> Snagging
+                        </div>
+                        <div class="nav-step" onclick="showStep(3)">
+                            <i class="fas fa-calendar-check me-1"></i> First Visit
+                        </div>
+                        <div class="nav-step" onclick="showStep(4)">
+                            <i class="fas fa-handshake me-1"></i> Handover
+                        </div>
+                        <div class="nav-step" onclick="showStep(5)">
+                            <i class="fas fa-hammer me-1"></i> Interiors
+                        </div>
+                        <div class="nav-step" onclick="showStep(6)">
+                            <i class="fas fa-home me-1"></i> Move-in
+                        </div>
                     </div>
                 </div>
                 
                 <!-- Step 1: Key Handover -->
-                <div class="process-step" id="step1">
+                <div class="process-step" id="step1-container">
                     <div class="step-header">
                         <div class="step-number">1</div>
-                        <h4>Key Handover (Project → HOT Team)</h4>
-                    </div>
-                    
-                    <div class="row mb-3">
-                        <div class="col-md-4">
-                            <label class="form-label required">Select Tower</label>
-                            <select class="form-select" id="keyTower" onchange="loadFloors()">
-                                <option value="">-- Select --</option>
-                                <option value="A">Tower A</option>
-                                <option value="B">Tower B</option>
-                                <option value="C">Tower C</option>
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label required">Handover Person</label>
-                            <input type="text" class="form-control" id="keyPerson" placeholder="Project team member name">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label required">Handover Date</label>
-                            <input type="date" class="form-control" id="keyDate" value="<?php echo date('Y-m-d'); ?>">
+                        <div>
+                            <h4 class="mb-1">Key Handover (Project → HOTO Team)</h4>
+                            <p class="text-muted mb-0">Project team hands over apartment keys to HOTO team</p>
                         </div>
                     </div>
                     
-                    <div class="mb-3">
-                        <label class="form-label">Select Floor</label>
-                        <div class="floor-buttons" id="floorButtons">
-                            <!-- Floor buttons will be generated -->
+                    <div class="step-content">
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label required">Select Tower</label>
+                                <select class="form-select" id="keyTower" onchange="loadFloats()">
+                                    <option value="">-- Select --</option>
+                                    <option value="A">Tower A</option>
+                                    <option value="B">Tower B</option>
+                                    <option value="C">Tower C</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label required">Handover Person</label>
+                                <input type="text" class="form-control" id="keyPerson" placeholder="Project team member name">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label required">Handover Date</label>
+                                <input type="date" class="form-control" id="keyDate" value="<?php echo date('Y-m-d'); ?>">
+                            </div>
                         </div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Select Flat Number</label>
-                        <div class="flat-grid" id="flatGrid">
-                            <!-- Flat grid will be generated -->
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Select Floor</label>
+                            <div class="floor-buttons" id="floorButtons">
+                                <!-- Floor buttons will be generated -->
+                            </div>
                         </div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="incompleteKeys" onchange="toggleRemarks('keyRemarks')">
-                            <label class="form-check-label" for="incompleteKeys">
-                                Not all keys were handed over
-                            </label>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Select Flat Number</label>
+                            <div class="flat-grid" id="flatGrid">
+                                <!-- Flat grid will be generated -->
+                            </div>
                         </div>
+                        
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="incompleteKeys" onchange="toggleRemarks('keyRemarks')">
+                                <label class="form-check-label" for="incompleteKeys">
+                                    Not all keys were handed over
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="remarks-box" id="keyRemarks">
+                            <label class="form-label required">Remarks on Missing Keys</label>
+                            <textarea class="form-control" id="keyRemarksText" rows="3" placeholder="Specify which keys are missing..."></textarea>
+                        </div>
+                        
+                        <button class="btn btn-success" onclick="saveKeyHandover()">
+                            <i class="fas fa-check"></i> Save Key Handover
+                        </button>
+                        <button class="btn btn-outline-secondary ms-2" onclick="clearStep1()">
+                            <i class="fas fa-times"></i> Clear Form
+                        </button>
                     </div>
-                    
-                    <div class="remarks-box" id="keyRemarks">
-                        <label class="form-label required">Remarks on Missing Keys</label>
-                        <textarea class="form-control" id="keyRemarksText" rows="3" placeholder="Specify which keys are missing..."></textarea>
-                    </div>
-                    
-                    <button class="btn btn-success" onclick="saveKeyHandover()">
-                        <i class="fas fa-check"></i> Save Key Handover
-                    </button>
                 </div>
                 
                 <!-- Step 2: Snagging Process -->
-                <div class="process-step" id="step2">
+                <div class="process-step" id="step2-container" style="display: none;">
                     <div class="step-header">
                         <div class="step-number">2</div>
-                        <h4>Snagging Process</h4>
-                    </div>
-                    
-                    <div class="alert alert-info">
-                        <i class="fas fa-info-circle"></i> Alerts will be sent to project team on 6th and 7th working day
-                    </div>
-                    
-                    <div class="row mb-3">
-                        <div class="col-md-3">
-                            <label class="form-label required">Tower</label>
-                            <select class="form-select" id="snagTower">
-                                <option value="">-- Select --</option>
-                                <option value="A">Tower A</option>
-                                <option value="B">Tower B</option>
-                                <option value="C">Tower C</option>
-                            </select>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label required">Flat Number</label>
-                            <input type="text" class="form-control" id="snagFlat" placeholder="e.g., 1503">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label required">Start Date</label>
-                            <input type="date" class="form-control" id="snagStart" value="<?php echo date('Y-m-d'); ?>">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">End Date</label>
-                            <input type="date" class="form-control" id="snagEnd">
+                        <div>
+                            <h4 class="mb-1">Snagging Process</h4>
+                            <p class="text-muted mb-0">Inspection and documentation of defects</p>
                         </div>
                     </div>
                     
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <label class="form-label required">Inspected By</label>
-                            <input type="text" class="form-control" id="snagInspector" placeholder="HOT team member name">
+                    <div class="step-content">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i> Alerts will be sent to project team on 6th and 7th working day
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Follow-up Date</label>
-                            <input type="date" class="form-control" id="snagFollowup">
-                        </div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label required">Snag Categories</label>
-                        <div class="checkbox-grid">
-                            <div class="check-item">
-                                <input type="checkbox" id="snagMEP" onchange="checkAllSnags()">
-                                <label for="snagMEP">MEP</label>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-3">
+                                <label class="form-label required">Tower</label>
+                                <select class="form-select" id="snagTower">
+                                    <option value="">-- Select --</option>
+                                    <option value="A">Tower A</option>
+                                    <option value="B">Tower B</option>
+                                    <option value="C">Tower C</option>
+                                </select>
                             </div>
-                            <div class="check-item">
-                                <input type="checkbox" id="snagCivil" onchange="checkAllSnags()">
-                                <label for="snagCivil">Civil/Finishing</label>
+                            <div class="col-md-3">
+                                <label class="form-label required">Flat Number</label>
+                                <input type="text" class="form-control" id="snagFlat" placeholder="e.g., 1503">
                             </div>
-                            <div class="check-item">
-                                <input type="checkbox" id="snagElectrical" onchange="checkAllSnags()">
-                                <label for="snagElectrical">Electrical</label>
+                            <div class="col-md-3">
+                                <label class="form-label required">Start Date</label>
+                                <input type="date" class="form-control" id="snagStart" value="<?php echo date('Y-m-d'); ?>">
                             </div>
-                            <div class="check-item">
-                                <input type="checkbox" id="snagWater" onchange="checkAllSnags()">
-                                <label for="snagWater">Water & Slopes</label>
-                            </div>
-                            <div class="check-item">
-                                <input type="checkbox" id="snagACDrain" onchange="checkAllSnags()">
-                                <label for="snagACDrain">AC Drain Pipe</label>
-                            </div>
-                            <div class="check-item">
-                                <input type="checkbox" id="snagTiles" onchange="checkAllSnags()">
-                                <label for="snagTiles">Tiles</label>
+                            <div class="col-md-3">
+                                <label class="form-label">End Date</label>
+                                <input type="date" class="form-control" id="snagEnd">
                             </div>
                         </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label required">Inspected By</label>
+                                <input type="text" class="form-control" id="snagInspector" placeholder="HOT team member name">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Follow-up Date</label>
+                                <input type="date" class="form-control" id="snagFollowup">
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label required">Snag Categories</label>
+                            <div class="checkbox-grid">
+                                <div class="check-item">
+                                    <input type="checkbox" id="snagMEP" onchange="checkAllSnags()">
+                                    <label for="snagMEP">MEP</label>
+                                </div>
+                                <div class="check-item">
+                                    <input type="checkbox" id="snagCivil" onchange="checkAllSnags()">
+                                    <label for="snagCivil">Civil/Finishing</label>
+                                </div>
+                                <div class="check-item">
+                                    <input type="checkbox" id="snagElectrical" onchange="checkAllSnags()">
+                                    <label for="snagElectrical">Electrical</label>
+                                </div>
+                                <div class="check-item">
+                                    <input type="checkbox" id="snagWater" onchange="checkAllSnags()">
+                                    <label for="snagWater">Water & Slopes</label>
+                                </div>
+                                <div class="check-item">
+                                    <input type="checkbox" id="snagACDrain" onchange="checkAllSnags()">
+                                    <label for="snagACDrain">AC Drain Pipe</label>
+                                </div>
+                                <div class="check-item">
+                                    <input type="checkbox" id="snagTiles" onchange="checkAllSnags()">
+                                    <label for="snagTiles">Tiles</label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="remarks-box" id="snagRemarks">
+                            <label class="form-label required">Remarks on Pending Snags</label>
+                            <textarea class="form-control" id="snagRemarksText" rows="4" placeholder="Specify pending snags and required actions..."></textarea>
+                        </div>
+                        
+                        <button class="btn btn-success" onclick="saveSnagging()">
+                            <i class="fas fa-file-export"></i> Generate Snag Report
+                        </button>
+                        <button class="btn btn-outline-secondary ms-2" onclick="clearStep2()">
+                            <i class="fas fa-times"></i> Clear Form
+                        </button>
                     </div>
-                    
-                    <div class="remarks-box" id="snagRemarks">
-                        <label class="form-label required">Remarks on Pending Snags</label>
-                        <textarea class="form-control" id="snagRemarksText" rows="4" placeholder="Specify pending snags and required actions..."></textarea>
-                    </div>
-                    
-                    <button class="btn btn-success" onclick="saveSnagging()">
-                        <i class="fas fa-file-export"></i> Generate Snag Report
-                    </button>
                 </div>
                 
                 <!-- Step 3: First Visit -->
-                <div class="process-step" id="step3">
+                <div class="process-step" id="step3-container" style="display: none;">
                     <div class="step-header">
                         <div class="step-number">3</div>
-                        <h4>Customer First Visit</h4>
-                    </div>
-                    
-                    <div class="row mb-3">
-                        <div class="col-md-4">
-                            <label class="form-label required">Tower</label>
-                            <select class="form-select" id="visitTower">
-                                <option value="">-- Select --</option>
-                                <option value="A">Tower A</option>
-                                <option value="B">Tower B</option>
-                                <option value="C">Tower C</option>
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label required">Flat Number</label>
-                            <input type="text" class="form-control" id="visitFlat" placeholder="e.g., 2107">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label required">Visit Date & Time</label>
-                            <input type="datetime-local" class="form-control" id="visitDateTime">
+                        <div>
+                            <h4 class="mb-1">Customer First Visit</h4>
+                            <p class="text-muted mb-0">Customer visits apartment for the first time</p>
                         </div>
                     </div>
                     
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <label class="form-label required">Owner Name</label>
-                            <input type="text" class="form-control" id="ownerName" placeholder="Customer full name">
+                    <div class="step-content">
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label required">Tower</label>
+                                <select class="form-select" id="visitTower">
+                                    <option value="">-- Select --</option>
+                                    <option value="A">Tower A</option>
+                                    <option value="B">Tower B</option>
+                                    <option value="C">Tower C</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label required">Flat Number</label>
+                                <input type="text" class="form-control" id="visitFlat" placeholder="e.g., 2107">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label required">Visit Date & Time</label>
+                                <input type="datetime-local" class="form-control" id="visitDateTime">
+                            </div>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label required">Contact Number</label>
-                            <input type="tel" class="form-control" id="ownerPhone" placeholder="10-digit mobile number">
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label required">Owner Name</label>
+                                <input type="text" class="form-control" id="ownerName" placeholder="Customer full name">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label required">Contact Number</label>
+                                <input type="tel" class="form-control" id="ownerPhone" placeholder="10-digit mobile number">
+                            </div>
                         </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label required">First visit acompained by</label>
+                                <input type="text" class="form-control" id="visitHOTMember" placeholder="Who accompanied customer">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Handover Date Suggested</label>
+                                <input type="datetime-local" class="form-control" id="visitHandoverDate">
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Customer Remarks</label>
+                            <textarea class="form-control" id="customerRemarks" rows="3" placeholder="Customer feedback and comments..."></textarea>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="crmNOC">
+                                <label class="form-check-label" for="crmNOC">
+                                    CRM NOC (No Objection Certificate) Received
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <button class="btn btn-success" onclick="saveFirstVisit()">
+                            <i class="fas fa-save"></i> Save First Visit
+                        </button>
+                        <button class="btn btn-primary ms-2" onclick="notifyProjectTeam()">
+                            <i class="fas fa-paper-plane"></i> Notify Project Team
+                        </button>
+                        <button class="btn btn-outline-secondary ms-2" onclick="clearStep3()">
+                            <i class="fas fa-times"></i> Clear Form
+                        </button>
                     </div>
-                    
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <label class="form-label required">HOT Team Member</label>
-                            <input type="text" class="form-control" id="visitHOTMember" placeholder="Who accompanied customer">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Handover Date Suggested</label>
-                            <input type="datetime-local" class="form-control" id="visitHandoverDate">
-                        </div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Customer Remarks</label>
-                        <textarea class="form-control" id="customerRemarks" rows="3" placeholder="Customer feedback and comments..."></textarea>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="crmNOC">
-                            <label class="form-check-label" for="crmNOC">
-                                CRM NOC (No Objection Certificate) Received
-                            </label>
-                        </div>
-                    </div>
-                    
-                    <button class="btn btn-success" onclick="saveFirstVisit()">
-                        <i class="fas fa-save"></i> Save First Visit
-                    </button>
-                    <button class="btn btn-primary ms-2" onclick="notifyProjectTeam()">
-                        <i class="fas fa-paper-plane"></i> Notify Project Team
-                    </button>
                 </div>
                 
-                <!-- Steps 4-6 would follow similar pattern -->
+                <!-- Step 4: Handover -->
+                <div class="process-step" id="step4-container" style="display: none;">
+                    <div class="step-header">
+                        <div class="step-number">4</div>
+                        <div>
+                            <h4 class="mb-1">Handover (HOTO Team → Customer)</h4>
+                            <p class="text-muted mb-0">Formal handover of Flat to customer</p>
+                        </div>
+                    </div>
+                    
+                    <div class="step-content">
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label required">Tower</label>
+                                <select class="form-select" id="hotoTower">
+                                    <option value="">-- Select --</option>
+                                    <option value="A">Tower A</option>
+                                    <option value="B">Tower B</option>
+                                    <option value="C">Tower C</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label required">Flat Number</label>
+                                <input type="text" class="form-control" id="hotoFlat" placeholder="e.g., 2107">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label required">Handover Date</label>
+                                <input type="datetime-local" class="form-control" id="hotoDateTime">
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label required">Customer Name</label>
+                                <input type="text" class="form-control" id="hotoCustomer" placeholder="Same as first visit">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label required">Handover done by</label>
+                                <input type="text" class="form-control" id="hotoHOTOMember" placeholder="Who conducted handover">
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label required">Documents Handed Over</label>
+                            <div class="checkbox-grid">
+                                <div class="check-item">
+                                    <input type="checkbox" id="docKeys">
+                                    <label for="docKeys">All Keys</label>
+                                </div>
+                                <div class="check-item">
+                                    <input type="checkbox" id="docManual">
+                                    <label for="docManual">Handover Book</label>
+                                </div>
+                                <div class="check-item">
+                                    <input type="checkbox" id="docAMC">
+                                    <label for="docAMC">Gift Box</label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Customer Feedback</label>
+                            <textarea class="form-control" id="hotoFeedback" rows="3" placeholder="Customer comments during handover..."></textarea>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="hotoCompleted">
+                                <label class="form-check-label" for="hotoCompleted">
+                                    Handover completed successfully
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <button class="btn btn-success" onclick="saveHandover()">
+                            <i class="fas fa-handshake"></i> Save Handover
+                        </button>
+                        <button class="btn btn-outline-secondary ms-2" onclick="clearStep4()">
+                            <i class="fas fa-times"></i> Clear Form
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Step 5: Interiors -->
+                <div class="process-step" id="step5-container" style="display: none;">
+                    <div class="step-header">
+                        <div class="step-number">5</div>
+                        <div>
+                            <h4 class="mb-1">Interior Work</h4>
+                            <p class="text-muted mb-0">Customer interior work begins</p>
+                        </div>
+                    </div>
+                    
+                    <div class="step-content">
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle"></i> Requires clearance from HOTO team before starting
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label required">Tower</label>
+                                <select class="form-select" id="interiorTower">
+                                    <option value="">-- Select --</option>
+                                    <option value="A">Tower A</option>
+                                    <option value="B">Tower B</option>
+                                    <option value="C">Tower C</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label required">Flat Number</label>
+                                <input type="text" class="form-control" id="interiorFlat" placeholder="e.g., 2107">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label required">Start Date</label>
+                                <input type="date" class="form-control" id="interiorStartDate">
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label required">Interior Contractor</label>
+                                <input type="text" class="form-control" id="interiorContractor" placeholder="Contractor company name">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Contractor Contact</label>
+                                <input type="text" class="form-control" id="interiorContractorContact" placeholder="Phone number">
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Expected Completion Date</label>
+                                <input type="date" class="form-control" id="interiorEndDate">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Documents collected By</label>
+                                <input type="text" class="form-control" id="interiorClearanceBy" placeholder="HOTO team member">
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label required">Type of Interior Work</label>
+                            <div class="checkbox-grid">
+                                <div class="check-item">
+                                    <input type="checkbox" id="intFlooring">
+                                    <label for="intFlooring">Flooring</label>
+                                </div>
+                                <div class="check-item">
+                                    <input type="checkbox" id="intPainting">
+                                    <label for="intPainting">Painting</label>
+                                </div>
+                                <div class="check-item">
+                                    <input type="checkbox" id="intCarpentry">
+                                    <label for="intCarpentry">Carpentry</label>
+                                </div>
+                                <div class="check-item">
+                                    <input type="checkbox" id="intElectrical">
+                                    <label for="intElectrical">Electrical</label>
+                                </div>
+                                <div class="check-item">
+                                    <input type="checkbox" id="intPlumbing">
+                                    <label for="intPlumbing">Plumbing</label>
+                                </div>
+                                <div class="check-item">
+                                    <input type="checkbox" id="intFalseCeiling">
+                                    <label for="intFalseCeiling">False Ceiling</label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Remarks</label>
+                            <textarea class="form-control" id="interiorRemarks" rows="3" placeholder="Any special instructions or notes..."></textarea>
+                        </div>
+                        
+                        <button class="btn btn-success" onclick="saveInteriors()">
+                            <i class="fas fa-hammer"></i> Save Interior Work
+                        </button>
+                        <button class="btn btn-outline-secondary ms-2" onclick="clearStep5()">
+                            <i class="fas fa-times"></i> Clear Form
+                        </button>
+                    </div>
+                </div>
+                
+                
+                <!-- Step 6: Move-in -->
+                <div class="process-step" id="step6-container" style="display: none;">
+                    <div class="step-header">
+                        <div class="step-number">6</div>
+                        <div>
+                            <h4 class="mb-1">Move-in</h4>
+                            <p class="text-muted mb-0">Customer moves into the Flat</p>
+                        </div>
+                    </div>
+                    
+                    <div class="step-content">
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label required">Tower</label>
+                                <select class="form-select" id="moveinTower">
+                                    <option value="">-- Select --</option>
+                                    <option value="A">Tower A</option>
+                                    <option value="B">Tower B</option>
+                                    <option value="C">Tower C</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label required">Flat Number</label>
+                                <input type="text" class="form-control" id="moveinFlat" placeholder="e.g., 2107">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label required">Move-in Date</label>
+                                <input type="datetime-local" class="form-control" id="moveinDateTime">
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label required">Customer Name</label>
+                                <input type="text" class="form-control" id="moveinCustomer" placeholder="Name of person moving in">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Contact Number</label>
+                                <input type="text" class="form-control" id="moveinContact" placeholder="Phone number">
+                            </div>
+                        </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Remarks / Special Instructions</label>
+                            <textarea class="form-control" id="moveinRemarks" rows="3" placeholder="Any special arrangements needed..."></textarea>
+                        </div>
+                        </div>
+                        
+                        <button class="btn btn-success" onclick="saveMovein()">
+                            <i class="fas fa-home"></i> Save Move-in
+                        </button>
+                        <button class="btn btn-outline-secondary ms-2" onclick="clearStep6()">
+                            <i class="fas fa-times"></i> Clear Form
+                        </button>
+                    </div>
+                </div>
                 
             </div>
         </div>
@@ -445,6 +796,7 @@
         // Data Entry JavaScript
         let currentFloor = 1;
         let selectedFlat = null;
+        let currentStep = 1;
         
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
@@ -459,6 +811,7 @@
             const tomorrow = new Date(today);
             tomorrow.setDate(tomorrow.getDate() + 1);
             
+            // Set dates for all steps
             document.getElementById('visitDateTime').value = 
                 today.toISOString().slice(0, 16);
             document.getElementById('visitHandoverDate').value = 
@@ -468,6 +821,32 @@
             snagEnd.setDate(snagEnd.getDate() + 7);
             document.getElementById('snagEnd').value = 
                 snagEnd.toISOString().split('T')[0];
+                
+            document.getElementById('hotoDateTime').value = 
+                today.toISOString().slice(0, 16);
+                
+            document.getElementById('interiorStartDate').value = 
+                today.toISOString().split('T')[0];
+                
+            document.getElementById('moveinDateTime').value = 
+                today.toISOString().slice(0, 16);
+        }
+        
+        // Show specific step
+        function showStep(step) {
+            // Hide all steps
+            for (let i = 1; i <= 6; i++) {
+                document.getElementById(`step${i}-container`).style.display = 'none';
+                document.querySelectorAll('.nav-step')[i-1].classList.remove('active');
+            }
+            
+            // Show selected step
+            document.getElementById(`step${step}-container`).style.display = 'block';
+            document.querySelectorAll('.nav-step')[step-1].classList.add('active');
+            currentStep = step;
+            
+            // Scroll to top
+            window.scrollTo(0, 0);
         }
         
         // Load floors for selected tower
@@ -556,9 +935,12 @@
                 cell.classList.toggle('selected', cellNumber === flatNumber);
             });
             
-            // Populate in other steps
+            // Populate in all steps
             document.getElementById('snagFlat').value = `${flatNumber}`;
             document.getElementById('visitFlat').value = `${flatNumber}`;
+            document.getElementById('hotoFlat').value = `${flatNumber}`;
+            document.getElementById('interiorFlat').value = `${flatNumber}`;
+            document.getElementById('moveinFlat').value = `${flatNumber}`;
         }
         
         // Toggle remarks box
@@ -623,15 +1005,18 @@
             // Update stats
             updateStats();
             
+            // Mark step as completed
+            document.querySelectorAll('.nav-step')[0].classList.add('completed');
+            
             // Show success
             alert(`Key handover for Tower ${tower} - Flat ${selectedFlat} saved successfully!`);
             
-            // Clear form
-            clearKeyHandoverForm();
+            // Move to next step
+            showStep(2);
         }
         
-        // Clear key handover form
-        function clearKeyHandoverForm() {
+        // Clear step 1
+        function clearStep1() {
             document.getElementById('keyPerson').value = '';
             document.getElementById('incompleteKeys').checked = false;
             document.getElementById('keyRemarksText').value = '';
@@ -694,11 +1079,32 @@
             // Update stats
             updateStats();
             
+            // Mark step as completed
+            document.querySelectorAll('.nav-step')[1].classList.add('completed');
+            
             // Show success
             alert(`Snagging report for Tower ${tower} - Flat ${flat} generated!`);
             
             // Send alert if 6th/7th day
             checkSnaggingAlerts();
+            
+            // Move to next step
+            showStep(3);
+        }
+        
+        // Clear step 2
+        function clearStep2() {
+            document.getElementById('snagTower').value = '';
+            document.getElementById('snagFlat').value = '';
+            document.getElementById('snagInspector').value = '';
+            document.getElementById('snagRemarksText').value = '';
+            
+            const snagCheckboxes = ['snagMEP', 'snagCivil', 'snagElectrical', 'snagWater', 'snagACDrain', 'snagTiles'];
+            snagCheckboxes.forEach(id => {
+                document.getElementById(id).checked = false;
+            });
+            
+            toggleRemarks('snagRemarks');
         }
         
         // Save first visit
@@ -741,8 +1147,247 @@
             // Update stats
             updateStats();
             
+            // Mark step as completed
+            document.querySelectorAll('.nav-step')[2].classList.add('completed');
+            
             // Show success
             alert(`First visit for Tower ${tower} - Flat ${flat} recorded!`);
+            
+            // Move to next step
+            showStep(4);
+        }
+        
+        // Clear step 3
+        function clearStep3() {
+            document.getElementById('visitTower').value = '';
+            document.getElementById('visitFlat').value = '';
+            document.getElementById('ownerName').value = '';
+            document.getElementById('ownerPhone').value = '';
+            document.getElementById('visitHOTMember').value = '';
+            document.getElementById('customerRemarks').value = '';
+            document.getElementById('crmNOC').checked = false;
+        }
+        
+        // Save handover
+        function saveHandover() {
+            const tower = document.getElementById('hotoTower').value;
+            const flat = document.getElementById('hotoFlat').value;
+            const customer = document.getElementById('hotoCustomer').value;
+            const hotMember = document.getElementById('hotoHOTMember').value;
+            const hotoDateTime = document.getElementById('hotoDateTime').value;
+            const completed = document.getElementById('hotoCompleted').checked;
+            
+            // Validation
+            if (!tower || !flat || !customer || !hotMember || !hotoDateTime) {
+                alert('Please fill all required fields (*)');
+                return;
+            }
+            
+            // Get documents checkboxes
+            const documents = {
+                keys: document.getElementById('docKeys').checked,
+                warranty: document.getElementById('docWarranty').checked,
+                manual: document.getElementById('docManual').checked,
+                amc: document.getElementById('docAMC').checked,
+                snag: document.getElementById('docSnag').checked,
+                noc: document.getElementById('docNOC').checked
+            };
+            
+            // Save to localStorage
+            let hotData = JSON.parse(localStorage.getItem('hot_process_data') || '{"towers":{"A":{"flats":{}},"B":{"flats":{}},"C":{"flats":{}}}}');
+            
+            const flatId = `${tower}-${flat}`;
+            if (!hotData.towers[tower].flats[flatId]) {
+                hotData.towers[tower].flats[flatId] = {};
+            }
+            
+            hotData.towers[tower].flats[flatId].handover = {
+                customer: customer,
+                hotMember: hotMember,
+                date: hotoDateTime,
+                documents: documents,
+                feedback: document.getElementById('hotoFeedback').value || null,
+                status: completed ? 'completed' : 'pending',
+                timestamp: new Date().toISOString()
+            };
+            
+            localStorage.setItem('hot_process_data', JSON.stringify(hotData));
+            
+            // Update stats
+            updateStats();
+            
+            // Mark step as completed
+            document.querySelectorAll('.nav-step')[3].classList.add('completed');
+            
+            // Show success
+            alert(`Handover for Tower ${tower} - Flat ${flat} saved!`);
+            
+            // Move to next step
+            showStep(5);
+        }
+        
+        // Clear step 4
+        function clearStep4() {
+            document.getElementById('hotoTower').value = '';
+            document.getElementById('hotoFlat').value = '';
+            document.getElementById('hotoCustomer').value = '';
+            document.getElementById('hotoHOTMember').value = '';
+            document.getElementById('hotoFeedback').value = '';
+            document.getElementById('hotoCompleted').checked = false;
+            
+            const docCheckboxes = ['docKeys', 'docWarranty', 'docManual', 'docAMC', 'docSnag', 'docNOC'];
+            docCheckboxes.forEach(id => {
+                document.getElementById(id).checked = false;
+            });
+        }
+        
+        // Save interiors
+        function saveInteriors() {
+            const tower = document.getElementById('interiorTower').value;
+            const flat = document.getElementById('interiorFlat').value;
+            const startDate = document.getElementById('interiorStartDate').value;
+            const contractor = document.getElementById('interiorContractor').value;
+            
+            // Validation
+            if (!tower || !flat || !startDate || !contractor) {
+                alert('Please fill all required fields (*)');
+                return;
+            }
+            
+            // Get interior work checkboxes
+            const workTypes = {
+                flooring: document.getElementById('intFlooring').checked,
+                painting: document.getElementById('intPainting').checked,
+                carpentry: document.getElementById('intCarpentry').checked,
+                electrical: document.getElementById('intElectrical').checked,
+                plumbing: document.getElementById('intPlumbing').checked,
+                falseCeiling: document.getElementById('intFalseCeiling').checked
+            };
+            
+            // Save to localStorage
+            let hotData = JSON.parse(localStorage.getItem('hot_process_data') || '{"towers":{"A":{"flats":{}},"B":{"flats":{}},"C":{"flats":{}}}}');
+            
+            const flatId = `${tower}-${flat}`;
+            if (!hotData.towers[tower].flats[flatId]) {
+                hotData.towers[tower].flats[flatId] = {};
+            }
+            
+            hotData.towers[tower].flats[flatId].interiors = {
+                startDate: startDate,
+                endDate: document.getElementById('interiorEndDate').value || null,
+                contractor: contractor,
+                contractorContact: document.getElementById('interiorContractorContact').value || null,
+                workTypes: workTypes,
+                clearanceBy: document.getElementById('interiorClearanceBy').value || null,
+                remarks: document.getElementById('interiorRemarks').value || null,
+                status: 'started',
+                timestamp: new Date().toISOString()
+            };
+            
+            localStorage.setItem('hot_process_data', JSON.stringify(hotData));
+            
+            // Update stats
+            updateStats();
+            
+            // Mark step as completed
+            document.querySelectorAll('.nav-step')[4].classList.add('completed');
+            
+            // Show success
+            alert(`Interior work for Tower ${tower} - Flat ${flat} saved!`);
+            
+            // Move to next step
+            showStep(6);
+        }
+        
+        // Clear step 5
+        function clearStep5() {
+            document.getElementById('interiorTower').value = '';
+            document.getElementById('interiorFlat').value = '';
+            document.getElementById('interiorContractor').value = '';
+            document.getElementById('interiorContractorContact').value = '';
+            document.getElementById('interiorClearanceBy').value = '';
+            document.getElementById('interiorRemarks').value = '';
+            
+            const workCheckboxes = ['intFlooring', 'intPainting', 'intCarpentry', 'intElectrical', 'intPlumbing', 'intFalseCeiling'];
+            workCheckboxes.forEach(id => {
+                document.getElementById(id).checked = false;
+            });
+        }
+        
+        // Save move-in
+        function saveMovein() {
+            const tower = document.getElementById('moveinTower').value;
+            const flat = document.getElementById('moveinFlat').value;
+            const customer = document.getElementById('moveinCustomer').value;
+            const moveinDateTime = document.getElementById('moveinDateTime').value;
+            const completed = document.getElementById('moveinCompleted').checked;
+            
+            // Validation
+            if (!tower || !flat || !customer || !moveinDateTime) {
+                alert('Please fill all required fields (*)');
+                return;
+            }
+            
+            // Get amenities checkboxes
+            const amenities = {
+                water: document.getElementById('amenWater').checked,
+                electricity: document.getElementById('amenElectricity').checked,
+                gas: document.getElementById('amenGas').checked,
+                internet: document.getElementById('amenInternet').checked,
+                parking: document.getElementById('amenParking').checked,
+                club: document.getElementById('amenClub').checked
+            };
+            
+            // Save to localStorage
+            let hotData = JSON.parse(localStorage.getItem('hot_process_data') || '{"towers":{"A":{"flats":{}},"B":{"flats":{}},"C":{"flats":{}}}}');
+            
+            const flatId = `${tower}-${flat}`;
+            if (!hotData.towers[tower].flats[flatId]) {
+                hotData.towers[tower].flats[flatId] = {};
+            }
+            
+            hotData.towers[tower].flats[flatId].movein = {
+                customer: customer,
+                date: moveinDateTime,
+                contact: document.getElementById('moveinContact').value || null,
+                coordinator: document.getElementById('moveinCoordinator').value || null,
+                deposit: document.getElementById('moveinDeposit').value || null,
+                amenities: amenities,
+                remarks: document.getElementById('moveinRemarks').value || null,
+                status: completed ? 'completed' : 'pending',
+                timestamp: new Date().toISOString()
+            };
+            
+            localStorage.setItem('hot_process_data', JSON.stringify(hotData));
+            
+            // Update stats
+            updateStats();
+            
+            // Mark step as completed
+            document.querySelectorAll('.nav-step')[5].classList.add('completed');
+            
+            // Show success
+            alert(`Move-in for Tower ${tower} - Flat ${flat} saved!`);
+            
+            // Process completed
+            alert(`All steps completed for Tower ${tower} - Flat ${flat}!`);
+        }
+        
+        // Clear step 6
+        function clearStep6() {
+            document.getElementById('moveinTower').value = '';
+            document.getElementById('moveinFlat').value = '';
+            document.getElementById('moveinCustomer').value = '';
+            document.getElementById('moveinContact').value = '';
+            document.getElementById('moveinCoordinator').value = '';
+            document.getElementById('moveinRemarks').value = '';
+            document.getElementById('moveinCompleted').checked = false;
+            document.getElementById('moveinDeposit').value = '';
+            
+            const amenCheckboxes = ['amenWater', 'amenElectricity', 'amenGas', 'amenInternet', 'amenParking', 'amenClub'];
+            amenCheckboxes.forEach(id => {
+                document.getElementById(id).checked = false;
+            });
         }
         
         // Notify project team
