@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HOTO Process Management System</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --cbre-blue: #1F3765;
+            --cbre-light-blue: #3E7CA6;
+            --cbre-celadon: #80BBAD;
+            --cbre-green: #17E88F;
+            --cbre-wheat: #DBD99A;
+            --cbre-orange: #D2785A;
+            --cbre-purple: #885073;
+            --cbre-dark-grey: #435254;
+            --cbre-light-grey: #CAD1D3;
+        }
+        
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .cbre-gradient {
+            background: linear-gradient(135deg, var(--cbre-blue) 0%, var(--cbre-light-blue) 100%);
+        }
+        
+        .sidebar {
+            background: white;
+            min-height: 100vh;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+            position: fixed;
+            width: 280px;
+            z-index: 1000;
+        }
+        
+        .main-content {
+            margin-left: 280px;
+            padding: 20px;
+        }
+        
+        .stat-card {
+            border-radius: 10px;
+            padding: 20px;
+            color: white;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            transition: transform 0.3s;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .stat-icon {
+            font-size: 2.5rem;
+            opacity: 0.9;
+        }
+        
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin: 10px 0;
+        }
+        
+        .stat-label {
+            font-size: 1rem;
+            opacity: 0.9;
+        }
+        
+        .progress-tower {
+            height: 8px;
+            border-radius: 4px;
+            margin: 5px 0;
+        }
+        
+        .tower-card {
+            border: none;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            transition: all 0.3s;
+        }
+        
+        .tower-card:hover {
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            transform: translateY(-3px);
+        }
+        
+        .activity-timeline {
+            border-left: 3px solid var(--cbre-light-blue);
+            padding-left: 20px;
+        }
+        
+        .activity-item {
+            position: relative;
+            margin-bottom: 20px;
+        }
+        
+        .activity-dot {
+            position: absolute;
+            left: -26px;
+            top: 5px;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--cbre-light-blue);
+        }
+        
+        .sync-status {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        
+        .sync-online {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .sync-offline {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .sync-pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+                position: relative;
+                min-height: auto;
+            }
+            
+            .main-content {
+                margin-left: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <div class="sidebar p-3">
+        <div class="text-center mb-4">
+            <img src="https://via.placeholder.com/150x50/1F3765/FFFFFF?text=CBRE+HOT" alt="CBRE HOTO" class="img-fluid mb-3">
+            <h5 class="text-muted">High Rise Building Complex</h5>
+        </div>
+        
+        <nav class="nav flex-column">
+            <a href="index.html" class="nav-link active py-3">
+                <i class="fas fa-tachometer-alt me-2"></i> Dashboard
+            </a>
+            <a href="data-entry.html" class="nav-link py-3">
+                <i class="fas fa-key me-2"></i> Data Entry
+            </a>
+            <a href="excel-processor.html" class="nav-link py-3">
+                <i class="fas fa-file-excel me-2"></i> Excel Import
+            </a>
+            <a href="integration.html" class="nav-link py-3">
+                <i class="fas fa-sync-alt me-2"></i> Integration
+            </a>
+            <a href="dashboard.html" class="nav-link py-3">
+                <i class="fas fa-chart-bar me-2"></i> Analytics
+            </a>
+            
+            <hr class="my-3">
+            
+            <div class="mt-3">
+                <h6 class="text-muted mb-2">Quick Actions</h6>
+                <button class="btn btn-sm btn-outline-primary w-100 mb-2" onclick="syncAllData()">
+                    <i class="fas fa-sync"></i> Sync All Data
+                </button>
+                <button class="btn btn-sm btn-outline-success w-100 mb-2" onclick="exportReport()">
+                    <i class="fas fa-download"></i> Export Report
+                </button>
+                <button class="btn btn-sm btn-outline-warning w-100" onclick="showAlerts()">
+                    <i class="fas fa-bell"></i> View Alerts
+                </button>
+            </div>
+            
+            <hr class="my-3">
+            
+            <div class="sync-info">
+                <h6 class="text-muted mb-2">Sync Status</h6>
+                <div class="sync-status sync-online mb-2" id="syncStatus">
+                    <i class="fas fa-check-circle"></i> Online
+                </div>
+                <small class="text-muted" id="lastSync">
+                    Last sync: <span id="lastSyncTime">Never</span>
+                </small>
+            </div>
+        </nav>
+    </div>
+    
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2 class="mb-1">HOTO Process Dashboard</h2>
+                <p class="text-muted mb-0">Towers A, B, C | 939 Apartments | Real-time Monitoring</p>
+            </div>
+            <div class="d-flex align-items-center">
+                <span class="me-3 text-muted" id="currentDateTime"></span>
+                <button class="btn btn-primary" onclick="refreshDashboard()">
+                    <i class="fas fa-redo"></i> Refresh
+                </button>
+            </div>
+        </div>
+        
+        <!-- KPI Cards -->
+        <div class="row g-4 mb-4">
+            <div class="col-md-2">
+                <div class="stat-card" style="background: var(--cbre-celadon);">
+                    <i class="fas fa-key stat-icon"></i>
+                    <div class="stat-number" id="totalKeys">0</div>
+                    <div class="stat-label">Key Handovers</div>
+                    <div class="progress mt-2">
+                        <div class="progress-bar bg-white" id="keyProgress" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="stat-card" style="background: var(--cbre-green);">
+                    <i class="fas fa-search stat-icon"></i>
+                    <div class="stat-number" id="totalSnags">0</div>
+                    <div class="stat-label">Snagging Completed</div>
+                    <div class="progress mt-2">
+                        <div class="progress-bar bg-white" id="snagProgress" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="stat-card" style="background: var(--cbre-wheat);">
+                    <i class="fas fa-calendar-check stat-icon"></i>
+                    <div class="stat-number" id="totalVisits">0</div>
+                    <div class="stat-label">First Visits</div>
+                    <div class="progress mt-2">
+                        <div class="progress-bar bg-white" id="visitProgress" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="stat-card" style="background: var(--cbre-light-blue);">
+                    <i class="fas fa-handshake stat-icon"></i>
+                    <div class="stat-number" id="totalHandovers">0</div>
+                    <div class="stat-label">Handovers</div>
+                    <div class="progress mt-2">
+                        <div class="progress-bar bg-white" id="handoverProgress" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="stat-card" style="background: var(--cbre-orange);">
+                    <i class="fas fa-hammer stat-icon"></i>
+                    <div class="stat-number" id="totalInteriors">0</div>
+                    <div class="stat-label">Interiors Started</div>
+                    <div class="progress mt-2">
+                        <div class="progress-bar bg-white" id="interiorProgress" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="stat-card" style="background: var(--cbre-purple);">
+                    <i class="fas fa-home stat-icon"></i>
+                    <div class="stat-number" id="totalMoveins">0</div>
+                    <div class="stat-label">Move-ins</div>
+                    <div class="progress mt-2">
+                        <div class="progress-bar bg-white" id="moveinProgress" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Tower Progress -->
+        <div class="row g-4 mb-4">
+            <div class="col-md-4">
+                <div class="card tower-card">
+                    <div class="card-header d-flex align-items-center" style="background: var(--cbre-blue); color: white;">
+                        <div class="rounded-circle bg-white text-dark d-flex align-items-center justify-content-center" 
+                             style="width: 40px; height: 40px; margin-right: 10px;">
+                            <strong>A</strong>
+                        </div>
+                        <h5 class="mb-0">Tower A Progress</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <small class="text-muted">Key Handover</small>
+                            <div class="d-flex justify-content-between">
+                                <span id="towerAKeys">0/313</span>
+                                <span id="towerAKeysPercent">0%</span>
+                            </div>
+                            <div class="progress progress-tower">
+                                <div class="progress-bar" style="background: var(--cbre-celadon); width: 0%" id="towerAKeyBar"></div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <small class="text-muted">Snagging</small>
+                            <div class="d-flex justify-content-between">
+                                <span id="towerASnags">0/313</span>
+                                <span id="towerASnagsPercent">0%</span>
+                            </div>
+                            <div class="progress progress-tower">
+                                <div class="progress-bar" style="background: var(--cbre-green); width: 0%" id="towerASnagBar"></div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <small class="text-muted">Handover</small>
+                            <div class="d-flex justify-content-between">
+                                <span id="towerAHandovers">0/313</span>
+                                <span id="towerAHandoversPercent">0%</span>
+                            </div>
+                            <div class="progress progress-tower">
+                                <div class="progress-bar" style="background: var(--cbre-light-blue); width: 0%" id="towerAHandoverBar"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <small class="text-muted">Overall Progress</small>
+                            <div class="d-flex justify-content-between">
+                                <span>Completion</span>
+                                <span id="towerAOverall">0%</span>
+                            </div>
+                            <div class="progress progress-tower">
+                                <div class="progress-bar" style="background: var(--cbre-blue); width: 0%" id="towerAOverallBar"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="card tower-card">
+                    <div class="card-header d-flex align-items-center" style="background: var(--cbre-blue); color: white;">
+                        <div class="rounded-circle bg-white text-dark d-flex align-items-center justify-content-center" 
+                             style="width: 40px; height: 40px; margin-right: 10px;">
+                            <strong>B</strong>
+                        </div>
+                        <h5 class="mb-0">Tower B Progress</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <small class="text-muted">Key Handover</small>
+                            <div class="d-flex justify-content-between">
+                                <span id="towerBKeys">0/313</span>
+                                <span id="towerBKeysPercent">0%</span>
+                            </div>
+                            <div class="progress progress-tower">
+                                <div class="progress-bar" style="background: var(--cbre-celadon); width: 0%" id="towerBKeyBar"></div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <small class="text-muted">Snagging</small>
+                            <div class="d-flex justify-content-between">
+                                <span id="towerBSnags">0/313</span>
+                                <span id="towerBSnagsPercent">0%</span>
+                            </div>
+                            <div class="progress progress-tower">
+                                <div class="progress-bar" style="background: var(--cbre-green); width: 0%" id="towerBSnagBar"></div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <small class="text-muted">Handover</small>
+                            <div class="d-flex justify-content-between">
+                                <span id="towerBHandovers">0/313</span>
+                                <span id="towerBHandoversPercent">0%</span>
+                            </div>
+                            <div class="progress progress-tower">
+                                <div class="progress-bar" style="background: var(--cbre-light-blue); width: 0%" id="towerBHandoverBar"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <small class="text-muted">Overall Progress</small>
+                            <div class="d-flex justify-content-between">
+                                <span>Completion</span>
+                                <span id="towerBOverall">0%</span>
+                            </div>
+                            <div class="progress progress-tower">
+                                <div class="progress-bar" style="background: var(--cbre-blue); width: 0%" id="towerBOverallBar"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="card tower-card">
+                    <div class="card-header d-flex align-items-center" style="background: var(--cbre-blue); color: white;">
+                        <div class="rounded-circle bg-white text-dark d-flex align-items-center justify-content-center" 
+                             style="width: 40px; height: 40px; margin-right: 10px;">
+                            <strong>C</strong>
+                        </div>
+                        <h5 class="mb-0">Tower C Progress</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <small class="text-muted">Key Handover</small>
+                            <div class="d-flex justify-content-between">
+                                <span id="towerCKeys">0/313</span>
+                                <span id="towerCKeysPercent">0%</span>
+                            </div>
+                            <div class="progress progress-tower">
+                                <div class="progress-bar" style="background: var(--cbre-celadon); width: 0%" id="towerCKeyBar"></div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <small class="text-muted">Snagging</small>
+                            <div class="d-flex justify-content-between">
+                                <span id="towerCSnags">0/313</span>
+                                <span id="towerCSnagsPercent">0%</span>
+                            </div>
+                            <div class="progress progress-tower">
+                                <div class="progress-bar" style="background: var(--cbre-green); width: 0%" id="towerCSnagBar"></div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <small class="text-muted">Handover</small>
+                            <div class="d-flex justify-content-between">
+                                <span id="towerCHandovers">0/313</span>
+                                <span id="towerCHandoversPercent">0%</span>
+                            </div>
+                            <div class="progress progress-tower">
+                                <div class="progress-bar" style="background: var(--cbre-light-blue); width: 0%" id="towerCHandoverBar"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <small class="text-muted">Overall Progress</small>
+                            <div class="d-flex justify-content-between">
+                                <span>Completion</span>
+                                <span id="towerCOverall">0%</span>
+                            </div>
+                            <div class="progress progress-tower">
+                                <div class="progress-bar" style="background: var(--cbre-blue); width: 0%" id="towerCOverallBar"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Charts & Recent Activities -->
+        <div class="row g-4">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Weekly Progress Trend</h5>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="weeklyChart" height="250"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Recent Activities</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="activity-timeline" id="recentActivities">
+                            <!-- Activities will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Today's Summary -->
+        <div class="row g-4 mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Today's Summary</h5>
+                        <span class="badge bg-primary" id="todayDate"></span>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col">
+                                <h3 class="text-primary" id="todayKeys">0</h3>
+                                <small class="text-muted">Key Handovers</small>
+                            </div>
+                            <div class="col">
+                                <h3 class="text-success" id="todaySnags">0</h3>
+                                <small class="text-muted">Snagging Completed</small>
+                            </div>
+                            <div class="col">
+                                <h3 class="text-warning" id="todayVisits">0</h3>
+                                <small class="text-muted">First Visits</small>
+                            </div>
+                            <div class="col">
+                                <h3 class="text-info" id="todayHandovers">0</h3>
+                                <small class="text-muted">Handovers</small>
+                            </div>
+                            <div class="col">
+                                <h3 class="text-danger" id="todayMoveins">0</h3>
+                                <small class="text-muted">Move-ins</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // HOT System Configuration
+        const HOT_CONFIG = {
+            totalFlats: 939,
+            flatsPerTower: 313,
+            towers: ['A', 'B', 'C'],
+            googleScriptUrl: localStorage.getItem('google_script_url') || '',
+            apiEndpoints: {
+                save: 'https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec',
+                get: 'https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec'
+            }
+        };
+        
+        // Global data store
+        let hotData = {
+            towers: {
+                A: { flats: {}, stats: {} },
+                B: { flats: {}, stats: {} },
+                C: { flats: {}, stats: {} }
+            },
+            summary: {},
+            activities: []
+        };
+        
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            updateDateTime();
+            loadData();
+            initializeCharts();
+            setInterval(updateDateTime, 60000);
+            setInterval(checkSyncStatus, 30000);
+            
+            // Auto-refresh every 2 minutes
+            setInterval(loadData, 120000);
+        });
+        
+        // Update date and time
+        function updateDateTime() {
+            const now = new Date();
+            document.getElementById('currentDateTime').textContent = 
+                now.toLocaleDateString('en-US', { 
+                    weekday: 'long', 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            document.getElementById('todayDate').textContent = 
+                now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        }
+        
+        // Load data from localStorage and Google Sheets
+        async function loadData() {
+            // Load from localStorage
+            const savedData = localStorage.getItem('hot_process_data');
+            if (savedData) {
+                hotData = JSON.parse(savedData);
+            }
+            
+            // Try to sync with Google Sheets if online
+            if (navigator.onLine && HOT_CONFIG.googleScriptUrl) {
+                await syncWithGoogleSheets();
+            }
+            
+            // Calculate statistics
+            calculateStatistics();
+            
+            // Update UI
+            updateDashboard();
+            
+            // Update last sync time
+            updateSyncStatus();
+        }
+        
+        // Calculate statistics from data
+        function calculateStatistics() {
+            const summary = {
+                keyHandovers: 0,
+                snagging: 0,
+                firstVisits: 0,
+                handovers: 0,
+                interiors: 0,
+                moveins: 0,
+                today: {
+                    keyHandovers: 0,
+                    snagging: 0,
+                    firstVisits: 0,
+                    handovers: 0,
+                    moveins: 0
+                }
+            };
+            
+            const towerStats = {
+                A: { keyHandovers: 0, snagging: 0, firstVisits: 0, handovers: 0 },
+                B: { keyHandovers: 0, snagging: 0, firstVisits: 0, handovers: 0 },
+                C: { keyHandovers: 0, snagging: 0, firstVisits: 0, handovers: 0 }
+            };
+            
+            const today = new Date().toDateString();
+            const activities = [];
+            
+            // Process each tower
+            HOT_CONFIG.towers.forEach(tower => {
+                const flats = hotData.towers[tower].flats;
+                
+                Object.entries(flats).forEach(([flatId, flatData]) => {
+                    // Key Handover
+                    if (flatData.keyHandover && flatData.keyHandover.status === 'completed') {
+                        summary.keyHandovers++;
+                        towerStats[tower].keyHandovers++;
+                        
+                        if (new Date(flatData.keyHandover.date).toDateString() === today) {
+                            summary.today.keyHandovers++;
+                        }
+                        
+                        activities.push({
+                            type: 'key',
+                            tower: tower,
+                            flat: flatId,
+                            time: flatData.keyHandover.date,
+                            person: flatData.keyHandover.person,
+                            description: `Key handover for Tower ${tower} - Flat ${flatId}`
+                        });
+                    }
+                    
+                    // Snagging
+                    if (flatData.snagging && flatData.snagging.status === 'completed') {
+                        summary.snagging++;
+                        towerStats[tower].snagging++;
+                        
+                        if (new Date(flatData.snagging.endDate).toDateString() === today) {
+                            summary.today.snagging++;
+                        }
+                    }
+                    
+                    // First Visit
+                    if (flatData.firstVisit && flatData.firstVisit.status === 'completed') {
+                        summary.firstVisits++;
+                        towerStats[tower].firstVisits++;
+                        
+                        if (new Date(flatData.firstVisit.visitDate).toDateString() === today) {
+                            summary.today.firstVisits++;
+                        }
+                    }
+                    
+                    // Handover
+                    if (flatData.handover && flatData.handover.status === 'completed') {
+                        summary.handovers++;
+                        towerStats[tower].handovers++;
+                        
+                        if (new Date(flatData.handover.date).toDateString() === today) {
+                            summary.today.handovers++;
+                        }
+                    }
+                    
+                    // Move-in
+                    if (flatData.interiors && flatData.interiors.moveInClearance) {
+                        summary.moveins++;
+                        
+                        if (flatData.interiors.moveInDate && 
+                            new Date(flatData.interiors.moveInDate).toDateString() === today) {
+                            summary.today.moveins++;
+                        }
+                    }
+                });
+            });
+            
+            // Store calculated data
+            hotData.summary = summary;
+            hotData.towerStats = towerStats;
+            hotData.activities = activities.sort((a, b) => new Date(b.time) - new Date(a.time)).slice(0, 10);
+        }
+        
+        // Update dashboard UI
+        function updateDashboard() {
+            const s = hotData.summary;
+            
+            // Update KPI cards
+            document.getElementById('totalKeys').textContent = s.keyHandovers;
+            document.getElementById('totalSnags').textContent = s.snagging;
+            document.getElementById('totalVisits').textContent = s.firstVisits;
+            document.getElementById('totalHandovers').textContent = s.handovers;
+            document.getElementById('totalInteriors').textContent = s.interiors;
+            document.getElementById('totalMoveins').textContent = s.moveins;
+            
+            // Update progress bars
+            updateProgressBar('keyProgress', s.keyHandovers, HOT_CONFIG.totalFlats);
+            updateProgressBar('snagProgress', s.snagging, HOT_CONFIG.totalFlats);
+            updateProgressBar('visitProgress', s.firstVisits, HOT_CONFIG.totalFlats);
+            updateProgressBar('handoverProgress', s.handovers, HOT_CONFIG.totalFlats);
+            updateProgressBar('interiorProgress', s.interiors, HOT_CONFIG.totalFlats);
+            updateProgressBar('moveinProgress', s.moveins, HOT_CONFIG.totalFlats);
+            
+            // Update tower progress
+            updateTowerProgress('A');
+            updateTowerProgress('B');
+            updateTowerProgress('C');
+            
+            // Update today's summary
+            document.getElementById('todayKeys').textContent = s.today.keyHandovers;
+            document.getElementById('todaySnags').textContent = s.today.snagging;
+            document.getElementById('todayVisits').textContent = s.today.firstVisits;
+            document.getElementById('todayHandovers').textContent = s.today.handovers;
+            document.getElementById('todayMoveins').textContent = s.today.moveins;
+            
+            // Update recent activities
+            updateRecentActivities();
+        }
+        
+        // Update progress bar
+        function updateProgressBar(elementId, current, total) {
+            const percent = total > 0 ? Math.round((current / total) * 100) : 0;
+            document.getElementById(elementId).style.width = `${percent}%`;
+        }
+        
+        // Update tower progress
+        function updateTowerProgress(tower) {
+            const stats = hotData.towerStats[tower];
+            const totalFlats = HOT_CONFIG.flatsPerTower;
+            
+            // Update counts
+            document.getElementById(`tower${tower}Keys`).textContent = `${stats.keyHandovers}/${totalFlats}`;
+            document.getElementById(`tower${tower}Snags`).textContent = `${stats.snagging}/${totalFlats}`;
+            document.getElementById(`tower${tower}Handovers`).textContent = `${stats.handovers}/${totalFlats}`;
+            
+            // Update percentages
+            const keyPercent = Math.round((stats.keyHandovers / totalFlats) * 100);
+            const snagPercent = Math.round((stats.snagging / totalFlats) * 100);
+            const handoverPercent = Math.round((stats.handovers / totalFlats) * 100);
+            const overallPercent = Math.round((keyPercent + snagPercent + handoverPercent) / 3);
+            
+            document.getElementById(`tower${tower}KeysPercent`).textContent = `${keyPercent}%`;
+            document.getElementById(`tower${tower}SnagsPercent`).textContent = `${snagPercent}%`;
+            document.getElementById(`tower${tower}HandoversPercent`).textContent = `${handoverPercent}%`;
+            document.getElementById(`tower${tower}Overall`).textContent = `${overallPercent}%`;
+            
+            // Update progress bars
+            document.getElementById(`tower${tower}KeyBar`).style.width = `${keyPercent}%`;
+            document.getElementById(`tower${tower}SnagBar`).style.width = `${snagPercent}%`;
+            document.getElementById(`tower${tower}HandoverBar`).style.width = `${handoverPercent}%`;
+            document.getElementById(`tower${tower}OverallBar`).style.width = `${overallPercent}%`;
+        }
+        
+        // Update recent activities
+        function updateRecentActivities() {
+            const container = document.getElementById('recentActivities');
+            container.innerHTML = '';
+            
+            if (hotData.activities.length === 0) {
+                container.innerHTML = '<p class="text-muted text-center">No recent activities</p>';
+                return;
+            }
+            
+            hotData.activities.forEach(activity => {
+                const activityItem = document.createElement('div');
+                activityItem.className = 'activity-item';
+                
+                const iconMap = {
+                    'key': 'fa-key text-primary',
+                    'snag': 'fa-search text-success',
+                    'visit': 'fa-calendar-check text-warning',
+                    'hoto': 'fa-handshake text-info'
+                };
+                
+                const time = new Date(activity.time).toLocaleTimeString([], { 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                });
+                
+                activityItem.innerHTML = `
+                    <div class="activity-dot"></div>
+                    <div class="d-flex align-items-start">
+                        <i class="fas ${iconMap[activity.type] || 'fa-circle'} me-2 mt-1"></i>
+                        <div>
+                            <small class="d-block">${activity.description}</small>
+                            <small class="text-muted">${time} • ${activity.person}</small>
+                        </div>
+                    </div>
+                `;
+                
+                container.appendChild(activityItem);
+            });
+        }
+        
+        // Initialize charts
+        function initializeCharts() {
+            const ctx = document.getElementById('weeklyChart').getContext('2d');
+            window.weeklyChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                    datasets: [
+                        {
+                            label: 'Key Handovers',
+                            data: [12, 19, 8, 15, 22, 18, 10],
+                            borderColor: '#80BBAD',
+                            backgroundColor: 'rgba(128, 187, 173, 0.1)',
+                            borderWidth: 3,
+                            tension: 0.4,
+                            fill: true
+                        },
+                        {
+                            label: 'Handovers',
+                            data: [8, 12, 6, 14, 18, 15, 9],
+                            borderColor: '#3E7CA6',
+                            backgroundColor: 'rgba(62, 124, 166, 0.1)',
+                            borderWidth: 3,
+                            tension: 0.4,
+                            fill: true
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Number of Flats'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Sync with Google Sheets
+        async function syncWithGoogleSheets() {
+            if (!HOT_CONFIG.googleScriptUrl) return;
+            
+            try {
+                const response = await fetch(HOT_CONFIG.googleScriptUrl + '?action=get_dashboard_data');
+                const data = await response.json();
+                
+                if (data && data.summary) {
+                    // Merge Google Sheets data with local data
+                    hotData = mergeData(hotData, data);
+                    localStorage.setItem('hot_process_data', JSON.stringify(hotData));
+                }
+            } catch (error) {
+                console.error('Error syncing with Google Sheets:', error);
+            }
+        }
+        
+        // Merge local and remote data
+        function mergeData(localData, remoteData) {
+            // Implementation depends on your data structure
+            return localData; // Placeholder
+        }
+        
+        // Update sync status
+        function updateSyncStatus() {
+            const statusElement = document.getElementById('syncStatus');
+            const lastSyncElement = document.getElementById('lastSyncTime');
+            
+            if (navigator.onLine) {
+                statusElement.className = 'sync-status sync-online';
+                statusElement.innerHTML = '<i class="fas fa-check-circle"></i> Online';
+            } else {
+                statusElement.className = 'sync-status sync-offline';
+                statusElement.innerHTML = '<i class="fas fa-exclamation-circle"></i> Offline';
+            }
+            
+            const lastSync = localStorage.getItem('last_sync_time');
+            if (lastSync) {
+                lastSyncElement.textContent = new Date(lastSync).toLocaleTimeString();
+            }
+        }
+        
+        // Check sync status periodically
+        function checkSyncStatus() {
+            updateSyncStatus();
+            
+            // Auto-sync if online and hasn't synced in last 5 minutes
+            if (navigator.onLine) {
+                const lastSync = localStorage.getItem('last_sync_time');
+                const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+                
+                if (!lastSync || new Date(lastSync) < fiveMinutesAgo) {
+                    syncWithGoogleSheets();
+                }
+            }
+        }
+        
+        // Refresh dashboard
+        function refreshDashboard() {
+            loadData();
+            showNotification('Dashboard refreshed', 'success');
+        }
+        
+        // Sync all data
+        async function syncAllData() {
+            showNotification('Syncing all data...', 'info');
+            await syncWithGoogleSheets();
+            loadData();
+            showNotification('Data synced successfully', 'success');
+        }
+        
+        // Export report
+        function exportReport() {
+            const dataStr = JSON.stringify(hotData, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(dataBlob);
+            
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `HOT_Report_${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            
+            showNotification('Report exported successfully', 'success');
+        }
+        
+        // Show alerts
+        function showAlerts() {
+            // Check for pending snagging alerts
+            let pendingAlerts = 0;
+            
+            HOT_CONFIG.towers.forEach(tower => {
+                const flats = hotData.towers[tower].flats;
+                Object.values(flats).forEach(flatData => {
+                    if (flatData.snagging && flatData.snagging.status !== 'completed') {
+                        const endDate = new Date(flatData.snagging.endDate);
+                        const today = new Date();
+                        const daysDiff = Math.floor((today - endDate) / (1000 * 60 * 60 * 24));
+                        
+                        if (daysDiff >= 6) {
+                            pendingAlerts++;
+                        }
+                    }
+                });
+            });
+            
+            if (pendingAlerts > 0) {
+                alert(`You have ${pendingAlerts} pending snagging alerts!`);
+            } else {
+                alert('No pending alerts.');
+            }
+        }
+        
+        // Show notification
+        function showNotification(message, type) {
+            const notification = document.createElement('div');
+            notification.className = `alert alert-${type === 'success' ? 'success' : type === 'error' ? 'danger' : 'info'} alert-dismissible fade show`;
+            notification.style.position = 'fixed';
+            notification.style.top = '20px';
+            notification.style.right = '20px';
+            notification.style.zIndex = '9999';
+            notification.style.minWidth = '300px';
+            notification.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.remove();
+            }, 5000);
+        }
+    </script>
+</body>
+</html>

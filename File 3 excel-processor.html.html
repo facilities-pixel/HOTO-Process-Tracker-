@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel Import - HOT Process</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .upload-area {
+            border: 3px dashed #dee2e6;
+            border-radius: 10px;
+            padding: 60px 20px;
+            text-align: center;
+            transition: all 0.3s;
+            cursor: pointer;
+            background: #f8f9fa;
+        }
+        
+        .upload-area:hover {
+            border-color: #0d6efd;
+            background: #e7f1ff;
+        }
+        
+        .upload-area.dragover {
+            border-color: #0d6efd;
+            background: #e7f1ff;
+        }
+        
+        .preview-table {
+            max-height: 400px;
+            overflow-y: auto;
+            margin: 20px 0;
+        }
+        
+        .column-mapping {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        
+        .mapping-row {
+            display: flex;
+            align-items: center;
+            padding: 8px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .mapping-row:last-child {
+            border-bottom: none;
+        }
+        
+        .excel-col {
+            flex: 1;
+            font-weight: 600;
+            color: #1F3765;
+        }
+        
+        .mapping-select {
+            flex: 2;
+        }
+        
+        .progress-container {
+            margin: 20px 0;
+        }
+        
+        .import-log {
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 0.9rem;
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        
+        .log-success {
+            color: #198754;
+        }
+        
+        .log-error {
+            color: #dc3545;
+        }
+        
+        .log-warning {
+            color: #ffc107;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid py-4">
+        <div class="row">
+            <div class="col-lg-8 mx-auto">
+                <!-- Header -->
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div>
+                        <h2><i class="fas fa-file-excel text-success"></i> Excel Data Import</h2>
+                        <p class="text-muted">Import data from Excel/CSV files to HOT Process System</p>
+                    </div>
+                    <div>
+                        <a href="index.html" class="btn btn-outline-primary">
+                            <i class="fas fa-arrow-left"></i> Back to Dashboard
+                        </a>
+                    </div>
+                </div>
+                
+                <!-- Upload Area -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Step 1: Upload Excel File</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
+                            <i class="fas fa-file-excel fa-4x text-success mb-3"></i>
+                            <h4>Drop Excel file here or click to browse</h4>
+                            <p class="text-muted">Supports .xlsx, .xls, .csv files</p>
+                            <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style="display: none;" onchange="handleFileSelect(event)">
+                        </div>
+                        
+                        <div class="mt-3">
+                            <p class="text-muted">Or paste Excel data directly:</p>
+                            <textarea id="excelPaste" class="form-control" rows="5" placeholder="Paste CSV data here..."></textarea>
+                            <button class="btn btn-secondary mt-2" onclick="parsePastedData()">
+                                <i class="fas fa-paste"></i> Parse Pasted Data
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Data Preview -->
+                <div class="card mb-4" id="previewCard" style="display: none;">
+                    <div class="card-header">
+                        <h5 class="mb-0">Step 2: Data Preview</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="preview-table">
+                            <table class="table table-bordered table-sm" id="previewTable">
+                                <!-- Preview will be loaded here -->
+                            </table>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between mt-3">
+                            <div>
+                                <span class="badge bg-info" id="rowCount">0 rows</span>
+                                <span class="badge bg-info ms-2" id="colCount">0 columns</span>
+                            </div>
+                            <button class="btn btn-primary" onclick="setupColumnMapping()">
+                                <i class="fas fa-arrow-right"></i> Continue to Mapping
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Column Mapping -->
+                <div class="card mb-4" id="mappingCard" style="display: none;">
+                    <div class="card-header">
+                        <h5 class="mb-0">Step 3: Column Mapping</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted">Map Excel columns to HOT Process System fields</p>
+                        
+                        <div class="column-mapping" id="columnMapping">
+                            <!-- Mapping will be generated here -->
+                        </div>
+                        
+                        <div class="form-check mt-3">
+                            <input class="form-check-input" type="checkbox" id="skipFirstRow" checked>
+                            <label class="form-check-label" for="skipFirstRow">
+                                Skip first row (header)
+                            </label>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between mt-4">
+                            <button class="btn btn-secondary" onclick="backToPreview()">
+                                <i class="fas fa-arrow-left"></i> Back to Preview
+                            </button>
+                            <button class="btn btn-success" onclick="importData()">
+                                <i class="fas fa-database"></i> Import Data
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Import Progress -->
+                <div class="card mb-4" id="progressCard" style="display: none;">
+                    <div class="card-header">
+                        <h5 class="mb-0">Step 4: Import Progress</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="progress-container">
+                            <div class="d-flex justify-content-between mb-2">
+                                <span>Importing data...</span>
+                                <span id="importPercent">0%</span>
+                            </div>
+                            <div class="progress">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                     id="importProgress" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="import-log" id="importLog">
+                            <!-- Import logs will appear here -->
+                        </div>
+                        
+                        <div class="text-center mt-4">
+                            <button class="btn btn-primary" id="completeBtn" style="display: none;" onclick="importComplete()">
+                                <i class="fas fa-check"></i> Import Complete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Excel Templates -->
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Excel Templates</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted">Download pre-formatted Excel templates:</p>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="card border-primary">
+                                    <div class="card-body text-center">
+                                        <i class="fas fa-key fa-2x text-primary mb-3"></i>
+                                        <h6>Key Handover Template</h6>
+                                        <button class="btn btn-sm btn-outline-primary" onclick="downloadTemplate('key_handover')">
+                                            <i class="fas fa-download"></i> Download
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card border-success">
+                                    <div class="card-body text-center">
+                                        <i class="fas fa-search fa-2x text-success mb-3"></i>
+                                        <h6>Snagging Template</h6>
+                                        <button class="btn btn-sm btn-outline-success" onclick="downloadTemplate('snagging')">
+                                            <i class="fas fa-download"></i> Download
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card border-warning">
+                                    <div class="card-body text-center">
+                                        <i class="fas fa-calendar-check fa-2x text-warning mb-3"></i>
+                                        <h6>First Visit Template</h6>
+                                        <button class="btn btn-sm btn-outline-warning" onclick="downloadTemplate('first_visit')">
+                                            <i class="fas fa-download"></i> Download
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script>
+        // Excel Processor JavaScript
+        let excelData = null;
+        let columnMapping = {};
+        let importLog = [];
+        
+        // Initialize drag and drop
+        document.addEventListener('DOMContentLoaded', function() {
+            const uploadArea = document.getElementById('uploadArea');
+            
+            uploadArea.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                uploadArea.classList.add('dragover');
+            });
+            
+            uploadArea.addEventListener('dragleave', function() {
+                uploadArea.classList.remove('dragover');
+            });
+            
+            uploadArea.addEventListener('drop', function(e) {
+                e.preventDefault();
+                uploadArea.classList.remove('dragover');
+                
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    handleFileSelect({ target: { files: files } });
+                }
+            });
+        });
+        
+        // Handle file selection
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                
+                // Show sheet selection
+                showSheetSelection(workbook);
+            };
+            
+            reader.readAsArrayBuffer(file);
+        }
+        
+        // Show sheet selection
+        function showSheetSelection(workbook) {
+            const sheetNames = workbook.SheetNames;
+            
+            if (sheetNames.length === 1) {
+                loadSheetData(workbook, sheetNames[0]);
+            } else {
+                let html = '<p>Select sheet to import:</p>';
+                sheetNames.forEach((sheetName, index) => {
+                    html += `
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="sheetSelect" 
+                                   value="${sheetName}" id="sheet${index}" ${index === 0 ? 'checked' : ''}>
+                            <label class="form-check-label" for="sheet${index}">
+                                ${sheetName}
+                            </label>
+                        </div>
+                    `;
+                });
+                
+                html += `<button class="btn btn-primary mt-3" onclick="loadSelectedSheet(workbook)">
+                            Load Selected Sheet
+                         </button>`;
+                
+                document.getElementById('uploadArea').innerHTML = html;
+            }
+        }
+        
+        // Load selected sheet
+        function loadSelectedSheet(workbook) {
+            const selectedSheet = document.querySelector('input[name="sheetSelect"]:checked').value;
+            loadSheetData(workbook, selectedSheet);
+        }
+        
+        // Load sheet data
+        function loadSheetData(workbook, sheetName) {
+            const worksheet = workbook.Sheets[sheetName];
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+            
+            excelData = jsonData;
+            showDataPreview(jsonData);
+        }
+        
+        // Show data preview
+        function showDataPreview(data) {
+            if (!data || data.length === 0) return;
+            
+            const previewTable = document.getElementById('previewTable');
+            const previewCard = document.getElementById('previewCard');
+            
+            // Clear previous preview
+            previewTable.innerHTML = '';
+            
+            // Show first 10 rows
+            const previewRows = Math.min(10, data.length);
+            
+            for (let i = 0; i < previewRows; i++) {
+                const row = document.createElement('tr');
+                
+                for (let j = 0; j < data[i].length; j++) {
+                    const cell = document.createElement(i === 0 ? 'th' : 'td');
+                    cell.textContent = data[i][j] || '';
+                    cell.title = `Row ${i+1}, Col ${j+1}`;
+                    row.appendChild(cell);
+                }
+                
+                previewTable.appendChild(row);
+            }
+            
+            // Update counts
+            document.getElementById('rowCount').textContent = `${data.length} rows`;
+            document.getElementById('colCount').textContent = `${data[0] ? data[0].length : 0} columns`;
+            
+            // Show preview card
+            previewCard.style.display = 'block';
+            previewCard.scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        // Parse pasted data
+        function parsePastedData() {
+            const pasteData = document.getElementById('excelPaste').value;
+            if (!pasteData.trim()) {
+                alert('Please paste some data first');
+                return;
+            }
+            
+            // Parse CSV
+            const rows = pasteData.split('\n').map(row => row.split(','));
+            excelData = rows;
+            showDataPreview(rows);
+        }
+        
+        // Setup column mapping
+        function setupColumnMapping() {
+            if (!excelData || excelData.length < 1) return;
+            
+            const headers = excelData[0];
+            const mappingDiv = document.getElementById('columnMapping');
+            const mappingCard = document.getElementById('mappingCard');
+            
+            // Field options
+            const fieldOptions = [
+                { value: '', label: '-- Ignore Column --' },
+                { value: 'tower', label: 'Tower (A, B, C)' },
+                { value: 'flat', label: 'Flat Number' },
+                { value: 'handover_person', label: 'Handover Person' },
+                { value: 'handover_date', label: 'Handover Date' },
+                { value: 'incomplete_keys', label: 'Incomplete Keys' },
+                { value: 'key_remarks', label: 'Key Remarks' },
+                { value: 'snag_inspector', label: 'Snag Inspector' },
+                { value: 'snag_start_date', label: 'Snag Start Date' },
+                { value: 'snag_end_date', label: 'Snag End Date' },
+                { value: 'owner_name', label: 'Owner Name' },
+                { value: 'owner_phone', label: 'Owner Phone' },
+                { value: 'visit_date', label: 'Visit Date' },
+                { value: 'hot_member', label: 'HOT Team Member' },
+                { value: 'remarks', label: 'Remarks' }
+            ];
+            
+            let html = '<h6>Map Excel Columns:</h6>';
+            
+            headers.forEach((header, index) => {
+                html += `
+                    <div class="mapping-row">
+                        <div class="excel-col">
+                            <small>Excel:</small><br>
+                            <strong>${header || `Column ${index+1}`}</strong>
+                        </div>
+                        <div class="mapping-select">
+                            <select class="form-select form-select-sm" id="map_${index}" 
+                                    onchange="updateColumnMapping(${index}, this.value)">
+                                ${fieldOptions.map(opt => 
+                                    `<option value="${opt.value}">${opt.label}</option>`
+                                ).join('')}
+                            </select>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            mappingDiv.innerHTML = html;
+            
+            // Show mapping card
+            mappingCard.style.display = 'block';
+            mappingCard.scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        // Update column mapping
+        function updateColumnMapping(columnIndex, fieldName) {
+            columnMapping[columnIndex] = fieldName;
+        }
+        
+        // Back to preview
+        function backToPreview() {
+            document.getElementById('mappingCard').style.display = 'none';
+            document.getElementById('previewCard').scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        // Import data
+        function importData() {
+            if (!excelData || excelData.length < 2) {
+                alert('No data to import');
+                return;
+            }
+            
+            // Get mapped columns
+            const mappedColumns = Object.keys(columnMapping).filter(key => columnMapping[key]);
+            
+            if (mappedColumns.length === 0) {
+                alert('Please map at least one column');
+                return;
+            }
+            
+            // Show progress card
+            document.getElementById('progressCard').style.display = 'block';
+            document.getElementById('progressCard').scrollIntoView({ behavior: 'smooth' });
+            
+            // Start import
+            startImportProcess();
+        }
+        
+        // Start import process
+        function startImportProcess() {
+            const skipHeader = document.getElementById('skipFirstRow').checked;
+            const startRow = skipHeader ? 1 : 0;
+            const totalRows = excelData.length - startRow;
+            let processedRows = 0;
+            let successCount = 0;
+            let errorCount = 0;
+            
+            const importLogDiv = document.getElementById('importLog');
+            importLogDiv.innerHTML = '';
+            
+            // Process each row
+            for (let i = startRow; i < excelData.length; i++) {
+                processedRows++;
+                const percent = Math.round((processedRows / totalRows) * 100);
+                
+                // Update progress
+                document.getElementById('importProgress').style.width = `${percent}%`;
+                document.getElementById('importPercent').textContent = `${percent}%`;
+                
+                // Process row
+                const row = excelData[i];
+                const rowData = {};
+                
+                // Map columns
+                Object.keys(columnMapping).forEach(colIndex => {
+                    if (columnMapping[colIndex] && row[colIndex]) {
+                        rowData[columnMapping[colIndex]] = row[colIndex];
+                    }
+                });
+                
+                // Import row
+                const result = importRowData(rowData, i + 1);
+                
+                // Log result
+                const logEntry = document.createElement('div');
+                logEntry.className = result.success ? 'log-success' : 'log-error';
+                logEntry.textContent = `Row ${i + 1}: ${result.message}`;
+                importLogDiv.appendChild(logEntry);
+                
+                if (result.success) {
+                    successCount++;
+                } else {
+                    errorCount++;
+                }
+                
+                // Scroll to bottom of log
+                importLogDiv.scrollTop = importLogDiv.scrollHeight;
+            }
+            
+            // Show complete button
+            document.getElementById('completeBtn').style.display = 'block';
+            
+            // Final log
+            const finalLog = document.createElement('div');
+            finalLog.className = 'log-success';
+            finalLog.innerHTML = `<strong>Import Complete:</strong> ${successCount} successful, ${errorCount} failed`;
+            importLogDiv.appendChild(finalLog);
+        }
+        
+        // Import single row of data
+        function importRowData(rowData, rowNumber) {
+            try {
+                // Validate required fields
+                if (!rowData.tower || !rowData.flat) {
+                    return {
+                        success: false,
+                        message: 'Missing tower or flat number'
+                    };
+                }
+                
+                // Load existing data
+                let hotData = JSON.parse(localStorage.getItem('hot_process_data') || '{"towers":{"A":{"flats":{}},"B":{"flats":{}},"C":{"flats":{}}}}');
+                
+                const flatId = `${rowData.tower}-${rowData.flat}`;
+                
+                // Determine data type based on available fields
+                if (rowData.handover_person) {
+                    // Key handover data
+                    if (!hotData.towers[rowData.tower].flats[flatId]) {
+                        hotData.towers[rowData.tower].flats[flatId] = {};
+                    }
+                    
+                    hotData.towers[rowData.tower].flats[flatId].keyHandover = {
+                        date: rowData.handover_date || new Date().toISOString().split('T')[0],
+                        person: rowData.handover_person,
+                        incompleteKeys: rowData.incomplete_keys === 'YES' || rowData.incomplete_keys === true,
+                        remarks: rowData.key_remarks || null,
+                        status: 'completed',
+                        imported: true,
+                        importDate: new Date().toISOString()
+                    };
+                }
+                
+                // Save to localStorage
+                localStorage.setItem('hot_process_data', JSON.stringify(hotData));
+                
+                return {
+                    success: true,
+                    message: `Imported data for Tower ${rowData.tower} - Flat ${rowData.flat}`
+                };
+                
+            } catch (error) {
+                return {
+                    success: false,
+                    message: `Error: ${error.message}`
+                };
+            }
+        }
+        
+        // Import complete
+        function importComplete() {
+            alert('Data import completed successfully!');
+            window.location.href = 'index.html';
+        }
+        
+        // Download template
+        function downloadTemplate(type) {
+            let templateData = [];
+            let filename = '';
+            
+            switch(type) {
+                case 'key_handover':
+                    templateData = [
+                        ['Tower', 'Flat', 'Handover_Person', 'Handover_Date', 'Incomplete_Keys', 'Remarks'],
+                        ['A', '1503', 'John Doe', '2023-10-15', 'NO', 'All keys received'],
+                        ['B', '2207', 'Jane Smith', '2023-10-16', 'YES', 'Missing main door key']
+                    ];
+                    filename = 'key_handover_template.xlsx';
+                    break;
+                    
+                case 'snagging':
+                    templateData = [
+                        ['Tower', 'Flat', 'Inspector', 'Start_Date', 'End_Date', 'MEP', 'Civil', 'Electrical', 'Water', 'AC_Drain', 'Tiles', 'Remarks'],
+                        ['A', '1503', 'Mike Johnson', '2023-10-15', '2023-10-22', 'YES', 'YES', 'NO', 'YES', 'YES', 'YES', 'Electrical pending'],
+                        ['C', '0905', 'Sarah Wilson', '2023-10-16', '2023-10-23', 'YES', 'NO', 'YES', 'YES', 'YES', 'NO', 'Civil work needed']
+                    ];
+                    filename = 'snagging_template.xlsx';
+                    break;
+                    
+                case 'first_visit':
+                    templateData = [
+                        ['Tower', 'Flat', 'Owner_Name', 'Owner_Phone', 'Visit_Date', 'HOT_Member', 'Handover_Date_Suggested', 'Remarks'],
+                        ['B', '2207', 'Robert Brown', '9876543210', '2023-10-20 14:30', 'Alex Chen', '2023-10-25 10:00', 'Customer satisfied'],
+                        ['A', '1806', 'Emily Davis', '8765432109', '2023-10-21 11:00', 'Sam Wilson', '', 'Rescue flat - special handling']
+                    ];
+                    filename = 'first_visit_template.xlsx';
+                    break;
+            }
+            
+            // Create worksheet
+            const worksheet = XLSX.utils.aoa_to_sheet(templateData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'Template');
+            
+            // Generate file
+            XLSX.writeFile(workbook, filename);
+        }
+    </script>
+</body>
+</html>
