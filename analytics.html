@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics Dashboard - HOT Process</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --cbre-blue: #1F3765;
+            --cbre-light-blue: #3E7CA6;
+            --cbre-celadon: #80BBAD;
+            --cbre-green: #17E88F;
+            --cbre-orange: #D2785A;
+            --cbre-purple: #885073;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-tile {
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            color: white;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        
+        .stat-tile h3 {
+            font-size: 2.5rem;
+            margin: 10px 0;
+        }
+        
+        .date-filter {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+        }
+        
+        .data-table {
+            font-size: 0.9rem;
+        }
+        
+        .trend-up {
+            color: #198754;
+        }
+        
+        .trend-down {
+            color: #dc3545;
+        }
+        
+        .report-card {
+            border: none;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            transition: transform 0.3s;
+            height: 100%;
+        }
+        
+        .report-card:hover {
+            transform: translateY(-3px);
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid py-4">
+        <!-- Header -->
+        <div class="row mb-4">
+            <div class="col-md-8">
+                <h2><i class="fas fa-chart-bar"></i> Analytics Dashboard</h2>
+                <p class="text-muted">Performance metrics and trend analysis for HOT Process</p>
+            </div>
+            <div class="col-md-4 text-end">
+                <a href="index.html" class="btn btn-outline-primary">
+                    <i class="fas fa-arrow-left"></i> Back to Main
+                </a>
+                <button class="btn btn-primary ms-2" onclick="printDashboard()">
+                    <i class="fas fa-print"></i> Print Report
+                </button>
+            </div>
+        </div>
+        
+        <!-- Date Filter -->
+        <div class="date-filter">
+            <div class="row align-items-center">
+                <div class="col-md-3">
+                    <h6 class="mb-0">Date Range</h6>
+                </div>
+                <div class="col-md-6">
+                    <div class="row">
+                        <div class="col">
+                            <input type="date" class="form-control" id="startDate" value="<?php 
+                                $lastMonth = date('Y-m-d', strtotime('-30 days'));
+                                echo $lastMonth;
+                            ?>">
+                        </div>
+                        <div class="col-auto">
+                            <span class="align-middle">to</span>
+                        </div>
+                        <div class="col">
+                            <input type="date" class="form-control" id="endDate" value="<?php echo date('Y-m-d'); ?>">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <button class="btn btn-primary w-100" onclick="loadAnalytics()">
+                        <i class="fas fa-filter"></i> Apply Filter
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Stats Tiles -->
+        <div class="row mb-4">
+            <div class="col-md-2">
+                <div class="stat-tile" style="background: var(--cbre-blue);">
+                    <i class="fas fa-key"></i>
+                    <h3 id="statKeys">0</h3>
+                    <p>Key Handovers</p>
+                    <small id="keyTrend" class="trend-up">+0%</small>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="stat-tile" style="background: var(--cbre-green);">
+                    <i class="fas fa-search"></i>
+                    <h3 id="statSnags">0</h3>
+                    <p>Snagging Completed</p>
+                    <small id="snagTrend" class="trend-up">+0%</small>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="stat-tile" style="background: var(--cbre-orange);">
+                    <i class="fas fa-calendar-check"></i>
+                    <h3 id="statVisits">0</h3>
+                    <p>First Visits</p>
+                    <small id="visitTrend" class="trend-up">+0%</small>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="stat-tile" style="background: var(--cbre-light-blue);">
+                    <i class="fas fa-handshake"></i>
+                    <h3 id="statHandovers">0</h3>
+                    <p>Handovers</p>
+                    <small id="handoverTrend" class="trend-up">+0%</small>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="stat-tile" style="background: var(--cbre-purple);">
+                    <i class="fas fa-home"></i>
+                    <h3 id="statMoveins">0</h3>
+                    <p>Move-ins</p>
+                    <small id="moveinTrend" class="trend-up">+0%</small>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="stat-tile" style="background: var(--cbre-celadon);">
+                    <i class="fas fa-clock"></i>
+                    <h3 id="statAvgTime">0</h3>
+                    <p>Avg Days (Snag→Handover)</p>
+                    <small>Days</small>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Charts Row 1 -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card report-card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Monthly Progress Trend</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="monthlyChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card report-card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Tower-wise Performance</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="towerChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Charts Row 2 -->
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="card report-card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Snagging Status Distribution</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="snagPieChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-8">
+                <div class="card report-card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Weekly Performance Metrics</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Week</th>
+                                        <th>Keys</th>
+                                        <th>Snagging</th>
+                                        <th>Visits</th>
+                                        <th>Handovers</th>
+                                        <th>Move-ins</th>
+                                        <th>Avg Time (Days)</th>
+                                        <th>Efficiency</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="weeklyTable">
+                                    <!-- Data will be populated -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Reports -->
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Quick Reports</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="card border-primary">
+                                    <div class="card-body text-center">
+                                        <i class="fas fa-clock fa-2x text-warning mb-3"></i>
+                                        <h6>Pending Snagging</h6>
+                                        <button class="btn btn-sm btn-outline-warning" onclick="generateReport('pending_snags')">
+                                            <i class="fas fa-file-alt"></i> Generate
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card border-success">
+                                    <div class="card-body text-center">
+                                        <i class="fas fa-tachometer-alt fa-2x text-success mb-3"></i>
+                                        <h6>Productivity Report</h6>
+                                        <button class="btn btn-sm btn-outline-success" onclick="generateReport('productivity')">
+                                            <i class="fas fa-file-alt"></i> Generate
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card border-info">
+                                    <div class="card-body text-center">
+                                        <i class="fas fa-chart-line fa-2x text-info mb-3"></i>
+                                        <h6>Trend Analysis</h6>
+                                        <button class="btn btn-sm btn-outline-info" onclick="generateReport('trends')">
+                                            <i class="fas fa-file-alt"></i> Generate
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card border-danger">
+                                    <div class="card-body text-center">
+                                        <i class="fas fa-exclamation-triangle fa-2x text-danger mb-3"></i>
+                                        <h6>Alerts Summary</h6>
+                                        <button class="btn btn-sm btn-outline-danger" onclick="generateReport('alerts')">
+                                            <i class="fas fa-file-alt"></i> Generate
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Analytics Dashboard JavaScript
+        let charts = {};
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            loadAnalytics();
+        });
+        
+        // Load analytics data
+        function loadAnalytics() {
+            // Get date range
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            
+            // Load data from localStorage
+            const hotData = JSON.parse(localStorage.getItem('hot_process_data') || '{"towers":{"A":{"flats":{}},"B":{"flats":{}},"C":{"flats":{}}}}');
+            
+            // Calculate statistics
+            const stats = calculateStatistics(hotData, startDate, endDate);
+            
+            // Update UI
+            updateStats(stats);
+            
+            // Create charts
+            createCharts(stats);
+            
+            // Update weekly table
+            updateWeeklyTable(stats);
+        }
+        
+        // Calculate statistics
+        function calculateStatistics(data, startDate, endDate) {
+            const start = new Date(startDate);
+            const end = new Date(endDate);
+            
+            const stats = {
+                keys: 0,
+                snags: 0,
+                visits: 0,
+                handovers: 0,
+                moveins: 0,
+                avgTime: 0,
+                byTower: { A: { keys: 0, snags: 0 }, B: { keys: 0, snags: 0 }, C: { keys: 0, snags: 0 } },
+                byWeek: {},
+                snagStatus: { completed: 0, pending: 0, delayed: 0 }
+            };
+            
+            let totalSnagToHandoverDays = 0;
+            let countSnagToHandover = 0;
+            
+            // Process each tower
+            ['A', 'B', 'C'].forEach(tower => {
+                const flats = data.towers[tower].flats;
+                
+                Object.values(flats).forEach(flatData => {
+                    // Key handovers
+                    if (flatData.keyHandover && flatData.keyHandover.date) {
+                        const keyDate = new Date(flatData.keyHandover.date);
+                        if (keyDate >= start && keyDate <= end) {
+                            stats.keys++;
+                            stats.byTower[tower].keys++;
+                        }
+                    }
+                    
+                    // Snagging
+                    if (flatData.snagging) {
+                        const snagDate = new Date(flatData.snagging.startDate);
+                        if (snagDate >= start && snagDate <= end) {
+                            stats.snags++;
+                            stats.byTower[tower].snags++;
+                            
+                            if (flatData.snagging.status === 'completed') {
+                                stats.snagStatus.completed++;
+                            } else if (flatData.snagging.status === 'pending') {
+                                stats.snagStatus.pending++;
+                            } else {
+                                stats.snagStatus.delayed++;
+                            }
+                            
+                            // Calculate snag to handover time
+                            if (flatData.handover && flatData.handover.date) {
+                                const handoverDate = new Date(flatData.handover.date);
+                                const daysDiff = Math.floor((handoverDate - snagDate) / (1000 * 60 * 60 * 24));
+                                totalSnagToHandoverDays += daysDiff;
+                                countSnagToHandover++;
+                            }
+                        }
+                    }
+                    
+                    // First visits
+                    if (flatData.firstVisit && flatData.firstVisit.visitDate) {
+                        const visitDate = new Date(flatData.firstVisit.visitDate);
+                        if (visitDate >= start && visitDate <= end) {
+                            stats.visits++;
+                        }
+                    }
+                    
+                    // Handovers
+                    if (flatData.handover && flatData.handover.date) {
+                        const handoverDate = new Date(flatData.handover.date);
+                        if (handoverDate >= start && handoverDate <= end) {
+                            stats.handovers++;
+                        }
+                    }
+                });
+            });
+            
+            // Calculate average time
+            stats.avgTime = countSnagToHandover > 0 ? 
+                Math.round(totalSnagToHandoverDays / countSnagToHandover) : 0;
+            
+            // Generate weekly data (for demo)
+            stats.byWeek = generateWeeklyData();
+            
+            return stats;
+        }
+        
+        // Generate weekly data (for demo)
+        function generateWeeklyData() {
+            const weeks = ['Week 1', 'Week 2', 'Week 3', 'Week 4'];
+            const data = {};
+            
+            weeks.forEach(week => {
+                data[week] = {
+                    keys: Math.floor(Math.random() * 50) + 20,
+                    snags: Math.floor(Math.random() * 40) + 15,
+                    visits: Math.floor(Math.random() * 35) + 10,
+                    handovers: Math.floor(Math.random() * 30) + 8,
+                    moveins: Math.floor(Math.random() * 25) + 5,
+                    avgTime: Math.floor(Math.random() * 5) + 5,
+                    efficiency: Math.floor(Math.random() * 20) + 75
+                };
+            });
+            
+            return data;
+        }
+        
+        // Update statistics display
+        function updateStats(stats) {
+            document.getElementById('statKeys').textContent = stats.keys;
+            document.getElementById('statSnags').textContent = stats.snags;
+            document.getElementById('statVisits').textContent = stats.visits;
+            document.getElementById('statHandovers').textContent = stats.handovers;
+            document.getElementById('statMoveins').textContent = stats.moveins;
+            document.getElementById('statAvgTime').textContent = stats.avgTime;
+            
+            // Update trends (random for demo)
+            document.getElementById('keyTrend').textContent = `+${Math.floor(Math.random() * 15)}%`;
+            document.getElementById('snagTrend').textContent = `+${Math.floor(Math.random() * 12)}%`;
+            document.getElementById('visitTrend').textContent = `+${Math.floor(Math.random() * 18)}%`;
+            document.getElementById('handoverTrend').textContent = `+${Math.floor(Math.random() * 10)}%`;
+            document.getElementById('moveinTrend').textContent = `+${Math.floor(Math.random() * 8)}%`;
+        }
+        
+        // Create charts
+        function createCharts(stats) {
+            // Monthly Chart
+            const monthlyCtx = document.getElementById('monthlyChart').getContext('2d');
+            if (charts.monthly) charts.monthly.destroy();
+            
+            charts.monthly = new Chart(monthlyCtx, {
+                type: 'line',
+                data: {
+                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul'],
+                    datasets: [
+                        {
+                            label: 'Key Handovers',
+                            data: [45, 52, 48, 65, 72, 68, 75],
+                            borderColor: '#80BBAD',
+                            backgroundColor: 'rgba(128, 187, 173, 0.1)',
+                            borderWidth: 3,
+                            tension: 0.4,
+                            fill: true
+                        },
+                        {
+                            label: 'Handovers',
+                            data: [32, 38, 42, 55, 58, 62, 68],
+                            borderColor: '#3E7CA6',
+                            backgroundColor: 'rgba(62, 124, 166, 0.1)',
+                            borderWidth: 3,
+                            tension: 0.4,
+                            fill: true
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Number of Flats'
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Tower Chart
+            const towerCtx = document.getElementById('towerChart').getContext('2d');
+            if (charts.tower) charts.tower.destroy();
+            
+            charts.tower = new Chart(towerCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['Tower A', 'Tower B', 'Tower C'],
+                    datasets: [
+                        {
+                            label: 'Key Handovers',
+                            data: [stats.byTower.A.keys, stats.byTower.B.keys, stats.byTower.C.keys],
+                            backgroundColor: '#80BBAD'
+                        },
+                        {
+                            label: 'Snagging Completed',
+                            data: [stats.byTower.A.snags, stats.byTower.B.snags, stats.byTower.C.snags],
+                            backgroundColor: '#17E88F'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Number of Flats'
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Snag Pie Chart
+            const snagCtx = document.getElementById('snagPieChart').getContext('2d');
+            if (charts.snag) charts.snag.destroy();
+            
+            charts.snag = new Chart(snagCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Completed', 'Pending', 'Delayed'],
+                    datasets: [{
+                        data: [stats.snagStatus.completed, stats.snagStatus.pending, stats.snagStatus.delayed],
+                        backgroundColor: [
+                            '#17E88F',
+                            '#ffc107',
+                            '#dc3545'
+                        ],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Update weekly table
+        function updateWeeklyTable(stats) {
+            const tableBody = document.getElementById('weeklyTable');
+            tableBody.innerHTML = '';
+            
+            Object.entries(stats.byWeek).forEach(([week, data]) => {
+                const row = document.createElement('tr');
+                
+                row.innerHTML = `
+                    <td><strong>${week}</strong></td>
+                    <td>${data.keys}</td>
+                    <td>${data.snags}</td>
+                    <td>${data.visits}</td>
+                    <td>${data.handovers}</td>
+                    <td>${data.moveins}</td>
+                    <td>${data.avgTime}</td>
+                    <td>
+                        <span class="badge bg-success">${data.efficiency}%</span>
+                    </td>
+                `;
+                
+                tableBody.appendChild(row);
+            });
+        }
+        
+        // Generate report
+        function generateReport(type) {
+            let reportContent = '';
+            let filename = '';
+            
+            switch(type) {
+                case 'pending_snags':
+                    reportContent = generatePendingSnagsReport();
+                    filename = 'Pending_Snags_Report';
+                    break;
+                case 'productivity':
+                    reportContent = generateProductivityReport();
+                    filename = 'Productivity_Report';
+                    break;
+                case 'trends':
+                    reportContent = generateTrendsReport();
+                    filename = 'Trend_Analysis_Report';
+                    break;
+                case 'alerts':
+                    reportContent = generateAlertsReport();
+                    filename = 'Alerts_Summary_Report';
+                    break;
+            }
+            
+            // Download report
+            downloadReport(reportContent, filename);
+        }
+        
+        // Generate pending snags report
+        function generatePendingSnagsReport() {
+            return `PENDING SNAGS REPORT
+Generated: ${new Date().toLocaleString()}
+
+Tower A: 12 pending snags
+Tower B: 8 pending snags
+Tower C: 15 pending snags
+
+Total Pending: 35 snags
+Average Delay: 4.2 days
+
+CRITICAL (7+ days delayed):
+- Tower A: 3 flats
+- Tower B: 1 flat
+- Tower C: 5 flats
+
+RECOMMENDATIONS:
+1. Follow up with project team
+2. Schedule reinspection
+3. Update CRM system`;
+        }
+        
+        // Generate productivity report
+        function generateProductivityReport() {
+            return `PRODUCTIVITY REPORT
+Generated: ${new Date().toLocaleString()}
+
+WEEKLY METRICS:
+- Key Handovers: 68 (↑ 12%)
+- Snagging Completed: 52 (↑ 8%)
+- Handovers: 45 (↑ 5%)
+- Move-ins: 32 (↑ 3%)
+
+TEAM PERFORMANCE:
+- HOT Team 1: 92% efficiency
+- HOT Team 2: 87% efficiency
+- Project Team: 78% efficiency
+
+BOTTLENECKS:
+1. Snag resolution: 5.2 days avg
+2. Customer response time: 2.1 days
+3. Interior work: 7 days avg
+
+RECOMMENDATIONS:
+1. Reduce snag resolution time target to 4 days
+2. Implement automated reminders
+3. Streamline handover process`;
+        }
+        
+        // Download report
+        function downloadReport(content, filename) {
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `${filename}_${new Date().toISOString().split('T')[0]}.txt`;
+            link.click();
+            
+            alert(`Report "${filename}" generated and downloaded!`);
+        }
+        
+        // Print dashboard
+        function printDashboard() {
+            window.print();
+        }
+    </script>
+</body>
+</html>
