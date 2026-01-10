@@ -189,6 +189,19 @@
             border-color: var(--cbre-green);
         }
         
+        .deviation-form {
+            display: none;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            border-left: 4px solid var(--cbre-orange);
+        }
+        
+        .deviation-form.active {
+            display: block;
+        }
+        
         .section-title {
             color: var(--cbre-blue);
             margin: 20px 0 15px 0;
@@ -365,7 +378,7 @@
                         <button class="btn btn-success" onclick="saveKeyHandover()">
                             <i class="fas fa-check"></i> Save Key Handover
                         </button>
-                        <button class="btn btn-outline-secondary ms-2" onclick="clearStep1()">
+                        <button class="btn btn-outline-secondary ms-2" onclick="clearStep(1)">
                             <i class="fas fa-times"></i> Clear Form
                         </button>
                     </div>
@@ -457,9 +470,9 @@
                         </div>
                         
                         <button class="btn btn-success" onclick="saveSnagging()">
-                            <i class="fas fa-file-export"></i> Generate Snag Report
+                            <i class="fas fa-save"></i> Save Snag Report
                         </button>
-                        <button class="btn btn-outline-secondary ms-2" onclick="clearStep2()">
+                        <button class="btn btn-outline-secondary ms-2" onclick="clearStep(2)">
                             <i class="fas fa-times"></i> Clear Form
                         </button>
                     </div>
@@ -538,7 +551,7 @@
                         <button class="btn btn-primary ms-2" onclick="notifyProjectTeam()">
                             <i class="fas fa-paper-plane"></i> Notify Project Team
                         </button>
-                        <button class="btn btn-outline-secondary ms-2" onclick="clearStep3()">
+                        <button class="btn btn-outline-secondary ms-2" onclick="clearStep(3)">
                             <i class="fas fa-times"></i> Clear Form
                         </button>
                     </div>
@@ -578,8 +591,26 @@
                         <div class="row mb-3">
                             <div class="col-md-6">
                                 <label class="form-label required">Customer Name</label>
-                                <input type="text" class="form-control" id="hotoCustomer" placeholder="Same as first visit">
+                                <input type="text" class="form-control" id="hotoCustomer" placeholder="Customer Name">
                             </div>
+                            <div class="col-md-6">
+                                <label class="form-label">2nd Owner Name</label>
+                                <input type="text" class="form-control" id="secondOwnerName" placeholder="If any Second Owner">
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label required">Owner Email Address</label>
+                                <input type="email" class="form-control" id="ownerEmail" placeholder="Owner Email Address">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Second Owner Email Address</label>
+                                <input type="email" class="form-control" id="secondOwnerEmail" placeholder="Second Owner Email Address">
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-3">
                             <div class="col-md-6">
                                 <label class="form-label required">Handover done by</label>
                                 <input type="text" class="form-control" id="hotoHOTOMember" placeholder="Who conducted handover">
@@ -621,7 +652,7 @@
                         <button class="btn btn-success" onclick="saveHandover()">
                             <i class="fas fa-handshake"></i> Save Handover
                         </button>
-                        <button class="btn btn-outline-secondary ms-2" onclick="clearStep4()">
+                        <button class="btn btn-outline-secondary ms-2" onclick="clearStep(4)">
                             <i class="fas fa-times"></i> Clear Form
                         </button>
                     </div>
@@ -719,15 +750,51 @@
                             <textarea class="form-control" id="interiorRemarks" rows="3" placeholder="Any special instructions or notes..."></textarea>
                         </div>
                         
+                        <!-- Record Deviation Button -->
+                        <button class="btn btn-warning mb-3" onclick="toggleDeviationForm()">
+                            <i class="fas fa-exclamation-triangle"></i> Record Deviation
+                        </button>
+                        
+                        <!-- Deviation Form -->
+                        <div class="deviation-form" id="deviationForm">
+                            <h5>Record Deviation</h5>
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label required">Visit Date</label>
+                                    <input type="datetime-local" class="form-control" id="deviationDate">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label required">Deviation Type</label>
+                                    <select class="form-select" id="deviationType">
+                                        <option value="">-- Select --</option>
+                                        <option value="safety">Fire Sprinklers</option>
+                                        <option value="quality">Smoke/Heat Detectors</option>
+                                        <option value="schedule">Chipping</option>
+                                        <option value="scope">SITOUT Ceiling</option>
+                                        <option value="other">Other</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label required">Deviation Details</label>
+                                <textarea class="form-control" id="deviationDetails" rows="3" placeholder="Describe the deviation..."></textarea>
+                            </div>
+                            <button class="btn btn-danger" onclick="saveDeviation()">
+                                <i class="fas fa-save"></i> Save Deviation
+                            </button>
+                            <button class="btn btn-outline-secondary ms-2" onclick="toggleDeviationForm()">
+                                <i class="fas fa-times"></i> Cancel
+                            </button>
+                        </div>
+                        
                         <button class="btn btn-success" onclick="saveInteriors()">
                             <i class="fas fa-hammer"></i> Save Interior Work
                         </button>
-                        <button class="btn btn-outline-secondary ms-2" onclick="clearStep5()">
+                        <button class="btn btn-outline-secondary ms-2" onclick="clearStep(5)">
                             <i class="fas fa-times"></i> Clear Form
                         </button>
                     </div>
                 </div>
-                
                 
                 <!-- Step 6: Move-in -->
                 <div class="process-step" id="step6-container" style="display: none;">
@@ -770,18 +837,16 @@
                                 <input type="text" class="form-control" id="moveinContact" placeholder="Phone number">
                             </div>
                         </div>
-                        </div>
                         
                         <div class="mb-3">
                             <label class="form-label">Remarks / Special Instructions</label>
                             <textarea class="form-control" id="moveinRemarks" rows="3" placeholder="Any special arrangements needed..."></textarea>
                         </div>
-                        </div>
                         
                         <button class="btn btn-success" onclick="saveMovein()">
                             <i class="fas fa-home"></i> Save Move-in
                         </button>
-                        <button class="btn btn-outline-secondary ms-2" onclick="clearStep6()">
+                        <button class="btn btn-outline-secondary ms-2" onclick="clearStep(6)">
                             <i class="fas fa-times"></i> Clear Form
                         </button>
                     </div>
@@ -828,6 +893,9 @@
                 today.toISOString().split('T')[0];
                 
             document.getElementById('moveinDateTime').value = 
+                today.toISOString().slice(0, 16);
+                
+            document.getElementById('deviationDate').value = 
                 today.toISOString().slice(0, 16);
         }
         
@@ -958,6 +1026,12 @@
             remarksBox.classList.toggle('active', !allChecked);
         }
         
+        // Toggle deviation form
+        function toggleDeviationForm() {
+            const form = document.getElementById('deviationForm');
+            form.classList.toggle('active');
+        }
+        
         // Save key handover
         function saveKeyHandover() {
             const tower = document.getElementById('keyTower').value;
@@ -1012,16 +1086,6 @@
             
             // Move to next step
             showStep(2);
-        }
-        
-        // Clear step 1
-        function clearStep1() {
-            document.getElementById('keyPerson').value = '';
-            document.getElementById('incompleteKeys').checked = false;
-            document.getElementById('keyRemarksText').value = '';
-            toggleRemarks('keyRemarks');
-            selectedFlat = null;
-            generateFlatGrid();
         }
         
         // Save snagging
@@ -1082,28 +1146,13 @@
             document.querySelectorAll('.nav-step')[1].classList.add('completed');
             
             // Show success
-            alert(`Snagging report for Tower ${tower} - Flat ${flat} generated!`);
+            alert(`Snagging report for Tower ${tower} - Flat ${flat} saved!`);
             
             // Send alert if 6th/7th day
             checkSnaggingAlerts();
             
             // Move to next step
             showStep(3);
-        }
-        
-        // Clear step 2
-        function clearStep2() {
-            document.getElementById('snagTower').value = '';
-            document.getElementById('snagFlat').value = '';
-            document.getElementById('snagInspector').value = '';
-            document.getElementById('snagRemarksText').value = '';
-            
-            const snagCheckboxes = ['snagMEP', 'snagCivil', 'snagElectrical', 'snagWater', 'snagACDrain', 'snagTiles'];
-            snagCheckboxes.forEach(id => {
-                document.getElementById(id).checked = false;
-            });
-            
-            toggleRemarks('snagRemarks');
         }
         
         // Save first visit
@@ -1156,28 +1205,20 @@
             showStep(4);
         }
         
-        // Clear step 3
-        function clearStep3() {
-            document.getElementById('visitTower').value = '';
-            document.getElementById('visitFlat').value = '';
-            document.getElementById('ownerName').value = '';
-            document.getElementById('ownerPhone').value = '';
-            document.getElementById('visitHOTMember').value = '';
-            document.getElementById('customerRemarks').value = '';
-            document.getElementById('crmNOC').checked = false;
-        }
-        
         // Save handover
         function saveHandover() {
             const tower = document.getElementById('hotoTower').value;
             const flat = document.getElementById('hotoFlat').value;
             const customer = document.getElementById('hotoCustomer').value;
-            const hotMember = document.getElementById('hotoHOTMember').value;
+            const secondOwner = document.getElementById('secondOwnerName').value;
+            const ownerEmail = document.getElementById('ownerEmail').value;
+            const secondOwnerEmail = document.getElementById('secondOwnerEmail').value;
+            const hotMember = document.getElementById('hotoHOTOMember').value;
             const hotoDateTime = document.getElementById('hotoDateTime').value;
             const completed = document.getElementById('hotoCompleted').checked;
             
             // Validation
-            if (!tower || !flat || !customer || !hotMember || !hotoDateTime) {
+            if (!tower || !flat || !customer || !ownerEmail || !hotMember || !hotoDateTime) {
                 alert('Please fill all required fields (*)');
                 return;
             }
@@ -1199,6 +1240,9 @@
             
             hotData.towers[tower].flats[flatId].handover = {
                 customer: customer,
+                secondOwner: secondOwner || null,
+                ownerEmail: ownerEmail,
+                secondOwnerEmail: secondOwnerEmail || null,
                 hotMember: hotMember,
                 date: hotoDateTime,
                 documents: documents,
@@ -1222,19 +1266,58 @@
             showStep(5);
         }
         
-        // Clear step 4
-        function clearStep4() {
-            document.getElementById('hotoTower').value = '';
-            document.getElementById('hotoFlat').value = '';
-            document.getElementById('hotoCustomer').value = '';
-            document.getElementById('hotoHOTMember').value = '';
-            document.getElementById('hotoFeedback').value = '';
-            document.getElementById('hotoCompleted').checked = false;
+        // Save deviation
+        function saveDeviation() {
+            const deviationDate = document.getElementById('deviationDate').value;
+            const deviationType = document.getElementById('deviationType').value;
+            const deviationDetails = document.getElementById('deviationDetails').value;
             
-            const docCheckboxes = ['docKeys', 'docManual', 'docAMC'];
-            docCheckboxes.forEach(id => {
-                document.getElementById(id).checked = false;
+            // Validation
+            if (!deviationDate || !deviationType || !deviationDetails) {
+                alert('Please fill all required fields in deviation form');
+                return;
+            }
+            
+            // Get current interior data
+            const tower = document.getElementById('interiorTower').value;
+            const flat = document.getElementById('interiorFlat').value;
+            
+            if (!tower || !flat) {
+                alert('Please fill tower and flat details first');
+                return;
+            }
+            
+            // Save to localStorage
+            let hotData = JSON.parse(localStorage.getItem('hot_process_data') || '{"towers":{"A":{"flats":{}},"B":{"flats":{}},"C":{"flats":{}}}}');
+            
+            const flatId = `${tower}-${flat}`;
+            if (!hotData.towers[tower].flats[flatId]) {
+                hotData.towers[tower].flats[flatId] = {};
+            }
+            
+            if (!hotData.towers[tower].flats[flatId].deviations) {
+                hotData.towers[tower].flats[flatId].deviations = [];
+            }
+            
+            // Add deviation
+            hotData.towers[tower].flats[flatId].deviations.push({
+                date: deviationDate,
+                type: deviationType,
+                details: deviationDetails,
+                timestamp: new Date().toISOString()
             });
+            
+            localStorage.setItem('hot_process_data', JSON.stringify(hotData));
+            
+            // Show success
+            alert(`Deviation recorded for Tower ${tower} - Flat ${flat}`);
+            
+            // Close deviation form
+            toggleDeviationForm();
+            
+            // Clear deviation form
+            document.getElementById('deviationType').value = '';
+            document.getElementById('deviationDetails').value = '';
         }
         
         // Save interiors
@@ -1295,21 +1378,6 @@
             showStep(6);
         }
         
-        // Clear step 5
-        function clearStep5() {
-            document.getElementById('interiorTower').value = '';
-            document.getElementById('interiorFlat').value = '';
-            document.getElementById('interiorContractor').value = '';
-            document.getElementById('interiorContractorContact').value = '';
-            document.getElementById('interiorClearanceBy').value = '';
-            document.getElementById('interiorRemarks').value = '';
-            
-            const workCheckboxes = ['intFlooring', 'intPainting', 'intCarpentry', 'intElectrical', 'intPlumbing', 'intFalseCeiling'];
-            workCheckboxes.forEach(id => {
-                document.getElementById(id).checked = false;
-            });
-        }
-        
         // Save move-in
         function saveMovein() {
             const tower = document.getElementById('moveinTower').value;
@@ -1355,13 +1423,86 @@
             alert(`All steps completed for Tower ${tower} - Flat ${flat}!`);
         }
         
-        // Clear step 6
-        function clearStep6() {
-            document.getElementById('moveinTower').value = '';
-            document.getElementById('moveinFlat').value = '';
-            document.getElementById('moveinCustomer').value = '';
-            document.getElementById('moveinContact').value = '';
-            document.getElementById('moveinRemarks').value = '';
+        // Clear step
+        function clearStep(step) {
+            switch(step) {
+                case 1:
+                    document.getElementById('keyPerson').value = '';
+                    document.getElementById('incompleteKeys').checked = false;
+                    document.getElementById('keyRemarksText').value = '';
+                    toggleRemarks('keyRemarks');
+                    selectedFlat = null;
+                    generateFlatGrid();
+                    break;
+                    
+                case 2:
+                    document.getElementById('snagTower').value = '';
+                    document.getElementById('snagFlat').value = '';
+                    document.getElementById('snagInspector').value = '';
+                    document.getElementById('snagRemarksText').value = '';
+                    
+                    const snagCheckboxes = ['snagMEP', 'snagCivil', 'snagElectrical', 'snagWater', 'snagACDrain', 'snagTiles'];
+                    snagCheckboxes.forEach(id => {
+                        document.getElementById(id).checked = false;
+                    });
+                    
+                    toggleRemarks('snagRemarks');
+                    break;
+                    
+                case 3:
+                    document.getElementById('visitTower').value = '';
+                    document.getElementById('visitFlat').value = '';
+                    document.getElementById('ownerName').value = '';
+                    document.getElementById('ownerPhone').value = '';
+                    document.getElementById('visitHOTMember').value = '';
+                    document.getElementById('customerRemarks').value = '';
+                    document.getElementById('crmNOC').checked = false;
+                    break;
+                    
+                case 4:
+                    document.getElementById('hotoTower').value = '';
+                    document.getElementById('hotoFlat').value = '';
+                    document.getElementById('hotoCustomer').value = '';
+                    document.getElementById('secondOwnerName').value = '';
+                    document.getElementById('ownerEmail').value = '';
+                    document.getElementById('secondOwnerEmail').value = '';
+                    document.getElementById('hotoHOTOMember').value = '';
+                    document.getElementById('hotoFeedback').value = '';
+                    document.getElementById('hotoCompleted').checked = false;
+                    
+                    const docCheckboxes = ['docKeys', 'docManual', 'docAMC'];
+                    docCheckboxes.forEach(id => {
+                        document.getElementById(id).checked = false;
+                    });
+                    break;
+                    
+                case 5:
+                    document.getElementById('interiorTower').value = '';
+                    document.getElementById('interiorFlat').value = '';
+                    document.getElementById('interiorContractor').value = '';
+                    document.getElementById('interiorContractorContact').value = '';
+                    document.getElementById('interiorClearanceBy').value = '';
+                    document.getElementById('interiorRemarks').value = '';
+                    
+                    const workCheckboxes = ['intFlooring', 'intPainting', 'intCarpentry', 'intElectrical', 'intPlumbing', 'intFalseCeiling'];
+                    workCheckboxes.forEach(id => {
+                        document.getElementById(id).checked = false;
+                    });
+                    
+                    // Hide deviation form if open
+                    document.getElementById('deviationForm').classList.remove('active');
+                    document.getElementById('deviationType').value = '';
+                    document.getElementById('deviationDetails').value = '';
+                    break;
+                    
+                case 6:
+                    document.getElementById('moveinTower').value = '';
+                    document.getElementById('moveinFlat').value = '';
+                    document.getElementById('moveinCustomer').value = '';
+                    document.getElementById('moveinContact').value = '';
+                    document.getElementById('moveinRemarks').value = '';
+                    break;
+            }
         }
         
         // Notify project team
