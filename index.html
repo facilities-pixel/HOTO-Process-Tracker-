@@ -19,8 +19,6 @@
             --cbre-purple: #885073;
             --cbre-dark-grey: #435254;
             --cbre-light-grey: #CAD1D3;
-            --text-orange: #D2785A;
-            --text-purple: #885073;
         }
         
         body {
@@ -135,21 +133,6 @@
             color: #856404;
         }
         
-        .nav-link {
-            color: #333;
-            border-radius: 8px;
-            margin-bottom: 5px;
-        }
-        
-        .nav-link.active {
-            background-color: var(--cbre-light-blue);
-            color: white;
-        }
-        
-        .nav-link:hover:not(.active) {
-            background-color: #f0f0f0;
-        }
-        
         @media (max-width: 768px) {
             .sidebar {
                 width: 100%;
@@ -166,11 +149,9 @@
 <body>
     <!-- Sidebar -->
     <div class="sidebar p-3">
-        <div class="text-center mb-4">
-            <!-- CBRE HOTO text logo -->
-            <div class="mb-3" style="color: #003f2d;">
-                <div style="font-size: 2.5rem; font-weight: 800; line-height: 1;">CBRE</div>
-            </div>
+        <div class="logo-display mb-4">
+            <h1 class="display-5 fw-bold text-dark" style="color: #0d6a4e !important; letter-spacing: 1px;">
+                CBRE
             <h5 class="text-muted">High Rise Building Complex</h5>
         </div>
         
@@ -187,7 +168,7 @@
             <a href="integration.html" class="nav-link py-3">
                 <i class="fas fa-sync-alt me-2"></i> Integration
             </a>
-            <a href="analytics.html" class="nav-link py-3">
+            <a href="dashboard.html" class="nav-link py-3">
                 <i class="fas fa-chart-bar me-2"></i> Analytics
             </a>
             
@@ -342,27 +323,6 @@
                                 <div class="progress-bar" style="background: var(--cbre-light-blue); width: 0%" id="towerAHandoverBar"></div>
                             </div>
                         </div>
-                        <div class="mb-3">
-                            <small class="text-muted">Interiors Started</small>
-                            <div class="d-flex justify-content-between">
-                                <span id="towerAInteriors">0/313</span>
-                                <span id="towerAInteriorsPercent">0%</span>
-                            </div>
-                            <div class="progress progress-tower">
-                                <div class="progress-bar" style="background: var(--cbre-orange); width: 0%" id="towerAInteriorBar"></div>
-                            </div>
-                        </div>
-                        <div>
-                            <small class="text-muted">Move-ins</small>
-                            <div class="d-flex justify-content-between">
-                                <span id="towerAMoveins">0/313</span>
-                                <span id="towerAMoveinsPercent">0%</span>
-                            </div>
-                            <div class="progress progress-tower">
-                                <div class="progress-bar" style="background: var(--cbre-purple); width: 0%" id="towerAMoveinBar"></div>
-                            </div>
-                        </div>
-                        <hr>
                         <div>
                             <small class="text-muted">Overall Progress</small>
                             <div class="d-flex justify-content-between">
@@ -417,27 +377,6 @@
                                 <div class="progress-bar" style="background: var(--cbre-light-blue); width: 0%" id="towerBHandoverBar"></div>
                             </div>
                         </div>
-                        <div class="mb-3">
-                            <small class="text-muted">Interiors Started</small>
-                            <div class="d-flex justify-content-between">
-                                <span id="towerBInteriors">0/313</span>
-                                <span id="towerBInteriorsPercent">0%</span>
-                            </div>
-                            <div class="progress progress-tower">
-                                <div class="progress-bar" style="background: var(--cbre-orange); width: 0%" id="towerBInteriorBar"></div>
-                            </div>
-                        </div>
-                        <div>
-                            <small class="text-muted">Move-ins</small>
-                            <div class="d-flex justify-content-between">
-                                <span id="towerBMoveins">0/313</span>
-                                <span id="towerBMoveinsPercent">0%</span>
-                            </div>
-                            <div class="progress progress-tower">
-                                <div class="progress-bar" style="background: var(--cbre-purple); width: 0%" id="towerBMoveinBar"></div>
-                            </div>
-                        </div>
-                        <hr>
                         <div>
                             <small class="text-muted">Overall Progress</small>
                             <div class="d-flex justify-content-between">
@@ -492,27 +431,6 @@
                                 <div class="progress-bar" style="background: var(--cbre-light-blue); width: 0%" id="towerCHandoverBar"></div>
                             </div>
                         </div>
-                        <div class="mb-3">
-                            <small class="text-muted">Interiors Started</small>
-                            <div class="d-flex justify-content-between">
-                                <span id="towerCInteriors">0/313</span>
-                                <span id="towerCInteriorsPercent">0%</span>
-                            </div>
-                            <div class="progress progress-tower">
-                                <div class="progress-bar" style="background: var(--cbre-orange); width: 0%" id="towerCInteriorBar"></div>
-                            </div>
-                        </div>
-                        <div>
-                            <small class="text-muted">Move-ins</small>
-                            <div class="d-flex justify-content-between">
-                                <span id="towerCMoveins">0/313</span>
-                                <span id="towerCMoveinsPercent">0%</span>
-                            </div>
-                            <div class="progress progress-tower">
-                                <div class="progress-bar" style="background: var(--cbre-purple); width: 0%" id="towerCMoveinBar"></div>
-                            </div>
-                        </div>
-                        <hr>
                         <div>
                             <small class="text-muted">Overall Progress</small>
                             <div class="d-flex justify-content-between">
@@ -621,6 +539,7 @@
         document.addEventListener('DOMContentLoaded', function() {
             updateDateTime();
             loadData();
+            initializeCharts();
             setInterval(updateDateTime, 60000);
             setInterval(checkSyncStatus, 30000);
             
@@ -644,21 +563,17 @@
                 now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         }
         
-        // Load data from localStorage
+        // Load data from localStorage and Google Sheets
         async function loadData() {
             // Load from localStorage
             const savedData = localStorage.getItem('hot_process_data');
             if (savedData) {
-                try {
-                    hotData = JSON.parse(savedData);
-                } catch (e) {
-                    console.error('Error parsing saved data:', e);
-                }
+                hotData = JSON.parse(savedData);
             }
             
-            // Initialize with sample data if empty
-            if (!hotData.towers.A.flats || Object.keys(hotData.towers.A.flats).length === 0) {
-                initializeSampleData();
+            // Try to sync with Google Sheets if online
+            if (navigator.onLine && HOT_CONFIG.googleScriptUrl) {
+                await syncWithGoogleSheets();
             }
             
             // Calculate statistics
@@ -669,55 +584,6 @@
             
             // Update last sync time
             updateSyncStatus();
-        }
-        
-        // Initialize sample data for testing
-        function initializeSampleData() {
-            const towers = ['A', 'B', 'C'];
-            const today = new Date();
-            
-            towers.forEach(tower => {
-                for (let i = 1; i <= 100; i++) {
-                    const flatId = `${tower}-${i.toString().padStart(3, '0')}`;
-                    
-                    // Randomly assign some flats with completed processes
-                    hotData.towers[tower].flats[flatId] = {
-                        keyHandover: Math.random() > 0.4 ? {
-                            status: 'completed',
-                            date: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString(),
-                            person: ['John Doe', 'Jane Smith', 'Bob Johnson'][Math.floor(Math.random() * 3)]
-                        } : null,
-                        
-                        snagging: Math.random() > 0.5 ? {
-                            status: Math.random() > 0.3 ? 'completed' : 'in-progress',
-                            startDate: new Date(Date.now() - Math.random() * 20 * 24 * 60 * 60 * 1000).toISOString(),
-                            endDate: new Date(Date.now() - Math.random() * 10 * 24 * 60 * 60 * 1000).toISOString()
-                        } : null,
-                        
-                        firstVisit: Math.random() > 0.5 ? {
-                            status: 'completed',
-                            visitDate: new Date(Date.now() - Math.random() * 15 * 24 * 60 * 60 * 1000).toISOString()
-                        } : null,
-                        
-                        handover: Math.random() > 0.6 ? {
-                            status: 'completed',
-                            date: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString()
-                        } : null,
-                        
-                        interiors: Math.random() > 0.7 ? {
-                            status: Math.random() > 0.5 ? 'started' : 'not-started'
-                        } : null,
-                        
-                        movein: Math.random() > 0.8 ? {
-                            status: 'completed',
-                            date: new Date(Date.now() - Math.random() * 5 * 24 * 60 * 60 * 1000).toISOString()
-                        } : null
-                    };
-                }
-            }
-            
-            // Save to localStorage
-            localStorage.setItem('hot_process_data', JSON.stringify(hotData));
         }
         
         // Calculate statistics from data
@@ -739,9 +605,9 @@
             };
             
             const towerStats = {
-                A: { keyHandovers: 0, snagging: 0, firstVisits: 0, handovers: 0, interiors: 0, moveins: 0 },
-                B: { keyHandovers: 0, snagging: 0, firstVisits: 0, handovers: 0, interiors: 0, moveins: 0 },
-                C: { keyHandovers: 0, snagging: 0, firstVisits: 0, handovers: 0, interiors: 0, moveins: 0 }
+                A: { keyHandovers: 0, snagging: 0, firstVisits: 0, handovers: 0 },
+                B: { keyHandovers: 0, snagging: 0, firstVisits: 0, handovers: 0 },
+                C: { keyHandovers: 0, snagging: 0, firstVisits: 0, handovers: 0 }
             };
             
             const today = new Date().toDateString();
@@ -757,8 +623,7 @@
                         summary.keyHandovers++;
                         towerStats[tower].keyHandovers++;
                         
-                        if (flatData.keyHandover.date && 
-                            new Date(flatData.keyHandover.date).toDateString() === today) {
+                        if (new Date(flatData.keyHandover.date).toDateString() === today) {
                             summary.today.keyHandovers++;
                         }
                         
@@ -767,7 +632,7 @@
                             tower: tower,
                             flat: flatId,
                             time: flatData.keyHandover.date,
-                            person: flatData.keyHandover.person || 'Unknown',
+                            person: flatData.keyHandover.person,
                             description: `Key handover for Tower ${tower} - Flat ${flatId}`
                         });
                     }
@@ -777,8 +642,7 @@
                         summary.snagging++;
                         towerStats[tower].snagging++;
                         
-                        if (flatData.snagging.endDate && 
-                            new Date(flatData.snagging.endDate).toDateString() === today) {
+                        if (new Date(flatData.snagging.endDate).toDateString() === today) {
                             summary.today.snagging++;
                         }
                     }
@@ -788,8 +652,7 @@
                         summary.firstVisits++;
                         towerStats[tower].firstVisits++;
                         
-                        if (flatData.firstVisit.visitDate && 
-                            new Date(flatData.firstVisit.visitDate).toDateString() === today) {
+                        if (new Date(flatData.firstVisit.visitDate).toDateString() === today) {
                             summary.today.firstVisits++;
                         }
                     }
@@ -799,25 +662,17 @@
                         summary.handovers++;
                         towerStats[tower].handovers++;
                         
-                        if (flatData.handover.date && 
-                            new Date(flatData.handover.date).toDateString() === today) {
+                        if (new Date(flatData.handover.date).toDateString() === today) {
                             summary.today.handovers++;
                         }
                     }
                     
-                    // Interiors
-                    if (flatData.interiors && flatData.interiors.status === 'started') {
-                        summary.interiors++;
-                        towerStats[tower].interiors++;
-                    }
-                    
                     // Move-in
-                    if (flatData.movein && flatData.movein.status === 'completed') {
+                    if (flatData.interiors && flatData.interiors.moveInClearance) {
                         summary.moveins++;
-                        towerStats[tower].moveins++;
                         
-                        if (flatData.movein.date && 
-                            new Date(flatData.movein.date).toDateString() === today) {
+                        if (flatData.interiors.moveInDate && 
+                            new Date(flatData.interiors.moveInDate).toDateString() === today) {
                             summary.today.moveins++;
                         }
                     }
@@ -864,18 +719,12 @@
             
             // Update recent activities
             updateRecentActivities();
-            
-            // Update chart
-            updateChart();
         }
         
         // Update progress bar
         function updateProgressBar(elementId, current, total) {
             const percent = total > 0 ? Math.round((current / total) * 100) : 0;
-            const element = document.getElementById(elementId);
-            if (element) {
-                element.style.width = `${percent}%`;
-            }
+            document.getElementById(elementId).style.width = `${percent}%`;
         }
         
         // Update tower progress
@@ -884,61 +733,34 @@
             const totalFlats = HOT_CONFIG.flatsPerTower;
             
             // Update counts
-            updateElementText(`tower${tower}Keys`, `${stats.keyHandovers}/${totalFlats}`);
-            updateElementText(`tower${tower}Snags`, `${stats.snagging}/${totalFlats}`);
-            updateElementText(`tower${tower}Handovers`, `${stats.handovers}/${totalFlats}`);
-            updateElementText(`tower${tower}Interiors`, `${stats.interiors}/${totalFlats}`);
-            updateElementText(`tower${tower}Moveins`, `${stats.moveins}/${totalFlats}`);
+            document.getElementById(`tower${tower}Keys`).textContent = `${stats.keyHandovers}/${totalFlats}`;
+            document.getElementById(`tower${tower}Snags`).textContent = `${stats.snagging}/${totalFlats}`;
+            document.getElementById(`tower${tower}Handovers`).textContent = `${stats.handovers}/${totalFlats}`;
             
             // Update percentages
             const keyPercent = Math.round((stats.keyHandovers / totalFlats) * 100);
             const snagPercent = Math.round((stats.snagging / totalFlats) * 100);
             const handoverPercent = Math.round((stats.handovers / totalFlats) * 100);
-            const interiorPercent = Math.round((stats.interiors / totalFlats) * 100);
-            const moveinPercent = Math.round((stats.moveins / totalFlats) * 100);
-            const overallPercent = Math.round((keyPercent + snagPercent + handoverPercent + interiorPercent + moveinPercent) / 5);
+            const overallPercent = Math.round((keyPercent + snagPercent + handoverPercent) / 3);
             
-            updateElementText(`tower${tower}KeysPercent`, `${keyPercent}%`);
-            updateElementText(`tower${tower}SnagsPercent`, `${snagPercent}%`);
-            updateElementText(`tower${tower}HandoversPercent`, `${handoverPercent}%`);
-            updateElementText(`tower${tower}InteriorsPercent`, `${interiorPercent}%`);
-            updateElementText(`tower${tower}MoveinsPercent`, `${moveinPercent}%`);
-            updateElementText(`tower${tower}Overall`, `${overallPercent}%`);
+            document.getElementById(`tower${tower}KeysPercent`).textContent = `${keyPercent}%`;
+            document.getElementById(`tower${tower}SnagsPercent`).textContent = `${snagPercent}%`;
+            document.getElementById(`tower${tower}HandoversPercent`).textContent = `${handoverPercent}%`;
+            document.getElementById(`tower${tower}Overall`).textContent = `${overallPercent}%`;
             
             // Update progress bars
-            updateProgressBarStyle(`tower${tower}KeyBar`, keyPercent, 'var(--cbre-celadon)');
-            updateProgressBarStyle(`tower${tower}SnagBar`, snagPercent, 'var(--cbre-green)');
-            updateProgressBarStyle(`tower${tower}HandoverBar`, handoverPercent, 'var(--cbre-light-blue)');
-            updateProgressBarStyle(`tower${tower}InteriorBar`, interiorPercent, 'var(--cbre-orange)');
-            updateProgressBarStyle(`tower${tower}MoveinBar`, moveinPercent, 'var(--cbre-purple)');
-            updateProgressBarStyle(`tower${tower}OverallBar`, overallPercent, 'var(--cbre-blue)');
-        }
-        
-        // Update element text safely
-        function updateElementText(elementId, text) {
-            const element = document.getElementById(elementId);
-            if (element) {
-                element.textContent = text;
-            }
-        }
-        
-        // Update progress bar style
-        function updateProgressBarStyle(elementId, percent, color) {
-            const element = document.getElementById(elementId);
-            if (element) {
-                element.style.width = `${percent}%`;
-                element.style.background = color;
-            }
+            document.getElementById(`tower${tower}KeyBar`).style.width = `${keyPercent}%`;
+            document.getElementById(`tower${tower}SnagBar`).style.width = `${snagPercent}%`;
+            document.getElementById(`tower${tower}HandoverBar`).style.width = `${handoverPercent}%`;
+            document.getElementById(`tower${tower}OverallBar`).style.width = `${overallPercent}%`;
         }
         
         // Update recent activities
         function updateRecentActivities() {
             const container = document.getElementById('recentActivities');
-            if (!container) return;
-            
             container.innerHTML = '';
             
-            if (!hotData.activities || hotData.activities.length === 0) {
+            if (hotData.activities.length === 0) {
                 container.innerHTML = '<p class="text-muted text-center">No recent activities</p>';
                 return;
             }
@@ -951,32 +773,21 @@
                     'key': 'fa-key text-primary',
                     'snag': 'fa-search text-success',
                     'visit': 'fa-calendar-check text-warning',
-                    'hoto': 'fa-handshake text-info',
-                    'interior': 'fa-hammer',
-                    'movein': 'fa-home'
+                    'hoto': 'fa-handshake text-info'
                 };
                 
-                const time = activity.time ? 
-                    new Date(activity.time).toLocaleTimeString([], { 
-                        hour: '2-digit', 
-                        minute: '2-digit' 
-                    }) : 'Unknown time';
-                
-                // Set color for interior and movein
-                let iconClass = iconMap[activity.type] || 'fa-circle';
-                if (activity.type === 'interior') {
-                    iconClass += ' text-orange';
-                } else if (activity.type === 'movein') {
-                    iconClass += ' text-purple';
-                }
+                const time = new Date(activity.time).toLocaleTimeString([], { 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                });
                 
                 activityItem.innerHTML = `
                     <div class="activity-dot"></div>
                     <div class="d-flex align-items-start">
-                        <i class="fas ${iconClass} me-2 mt-1"></i>
+                        <i class="fas ${iconMap[activity.type] || 'fa-circle'} me-2 mt-1"></i>
                         <div>
-                            <small class="d-block">${activity.description || 'Activity'}</small>
-                            <small class="text-muted">${time} • ${activity.person || 'Unknown'}</small>
+                            <small class="d-block">${activity.description}</small>
+                            <small class="text-muted">${time} • ${activity.person}</small>
                         </div>
                     </div>
                 `;
@@ -985,61 +796,40 @@
             });
         }
         
-        // Update chart
-        function updateChart() {
-            const ctx = document.getElementById('weeklyChart');
-            if (!ctx) return;
-            
-            // Destroy existing chart if exists
-            if (window.weeklyChartInstance) {
-                window.weeklyChartInstance.destroy();
-            }
-            
-            // Generate sample weekly data
-            const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-            const keyData = days.map(() => Math.floor(Math.random() * 20) + 5);
-            const snagData = days.map(() => Math.floor(Math.random() * 15) + 3);
-            const handoverData = days.map(() => Math.floor(Math.random() * 10) + 2);
-            
-            window.weeklyChartInstance = new Chart(ctx, {
+        // Initialize charts
+        function initializeCharts() {
+            const ctx = document.getElementById('weeklyChart').getContext('2d');
+            window.weeklyChart = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: days,
+                    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
                     datasets: [
                         {
                             label: 'Key Handovers',
-                            data: keyData,
-                            borderColor: 'var(--cbre-celadon)',
+                            data: [12, 19, 8, 15, 22, 18, 10],
+                            borderColor: '#80BBAD',
                             backgroundColor: 'rgba(128, 187, 173, 0.1)',
-                            tension: 0.3,
-                            fill: true
-                        },
-                        {
-                            label: 'Snagging',
-                            data: snagData,
-                            borderColor: 'var(--cbre-green)',
-                            backgroundColor: 'rgba(23, 232, 143, 0.1)',
-                            tension: 0.3,
+                            borderWidth: 3,
+                            tension: 0.4,
                             fill: true
                         },
                         {
                             label: 'Handovers',
-                            data: handoverData,
-                            borderColor: 'var(--cbre-light-blue)',
+                            data: [8, 12, 6, 14, 18, 15, 9],
+                            borderColor: '#3E7CA6',
                             backgroundColor: 'rgba(62, 124, 166, 0.1)',
-                            tension: 0.3,
+                            borderWidth: 3,
+                            tension: 0.4,
                             fill: true
                         }
                     ]
                 },
                 options: {
                     responsive: true,
+                    maintainAspectRatio: false,
                     plugins: {
                         legend: {
                             position: 'top',
-                        },
-                        title: {
-                            display: false
                         }
                     },
                     scales: {
@@ -1047,7 +837,7 @@
                             beginAtZero: true,
                             title: {
                                 display: true,
-                                text: 'Number of Units'
+                                text: 'Number of Flats'
                             }
                         }
                     }
@@ -1055,12 +845,34 @@
             });
         }
         
+        // Sync with Google Sheets
+        async function syncWithGoogleSheets() {
+            if (!HOT_CONFIG.googleScriptUrl) return;
+            
+            try {
+                const response = await fetch(HOT_CONFIG.googleScriptUrl + '?action=get_dashboard_data');
+                const data = await response.json();
+                
+                if (data && data.summary) {
+                    // Merge Google Sheets data with local data
+                    hotData = mergeData(hotData, data);
+                    localStorage.setItem('hot_process_data', JSON.stringify(hotData));
+                }
+            } catch (error) {
+                console.error('Error syncing with Google Sheets:', error);
+            }
+        }
+        
+        // Merge local and remote data
+        function mergeData(localData, remoteData) {
+            // Implementation depends on your data structure
+            return localData; // Placeholder
+        }
+        
         // Update sync status
         function updateSyncStatus() {
             const statusElement = document.getElementById('syncStatus');
             const lastSyncElement = document.getElementById('lastSyncTime');
-            
-            if (!statusElement || !lastSyncElement) return;
             
             if (navigator.onLine) {
                 statusElement.className = 'sync-status sync-online';
@@ -1072,7 +884,7 @@
             
             const lastSync = localStorage.getItem('last_sync_time');
             if (lastSync) {
-                document.getElementById('lastSyncTime').textContent = new Date(lastSync).toLocaleTimeString();
+                lastSyncElement.textContent = new Date(lastSync).toLocaleTimeString();
             }
         }
         
@@ -1086,7 +898,7 @@
                 const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
                 
                 if (!lastSync || new Date(lastSync) < fiveMinutesAgo) {
-                    // syncWithGoogleSheets(); // Uncomment when Google Sheets integration is ready
+                    syncWithGoogleSheets();
                 }
             }
         }
@@ -1097,47 +909,29 @@
             showNotification('Dashboard refreshed', 'success');
         }
         
-        // Sync all data (placeholder for Google Sheets integration)
+        // Sync all data
         async function syncAllData() {
             showNotification('Syncing all data...', 'info');
-            
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 1500));
-            
-            // Update last sync time
-            localStorage.setItem('last_sync_time', new Date().toISOString());
-            updateSyncStatus();
-            
+            await syncWithGoogleSheets();
+            loadData();
             showNotification('Data synced successfully', 'success');
-        }
-        
-        // Sync with Google Sheets (placeholder)
-        async function syncWithGoogleSheets() {
-            // This would be your actual Google Apps Script integration
-            console.log('Syncing with Google Sheets...');
-            // Implement actual Google Sheets sync logic here
         }
         
         // Export report
         function exportReport() {
-            try {
-                const dataStr = JSON.stringify(hotData, null, 2);
-                const dataBlob = new Blob([dataStr], { type: 'application/json' });
-                const url = URL.createObjectURL(dataBlob);
-                
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = `HOT_Report_${new Date().toISOString().split('T')[0]}.json`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                URL.revokeObjectURL(url);
-                
-                showNotification('Report exported successfully', 'success');
-            } catch (error) {
-                console.error('Export error:', error);
-                showNotification('Error exporting report', 'error');
-            }
+            const dataStr = JSON.stringify(hotData, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(dataBlob);
+            
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `HOT_Report_${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            
+            showNotification('Report exported successfully', 'success');
         }
         
         // Show alerts
@@ -1169,14 +963,8 @@
         
         // Show notification
         function showNotification(message, type) {
-            // Check if notification already exists
-            const existingNotification = document.querySelector('.alert-notification');
-            if (existingNotification) {
-                existingNotification.remove();
-            }
-            
             const notification = document.createElement('div');
-            notification.className = `alert alert-${type === 'success' ? 'success' : type === 'error' ? 'danger' : 'info'} alert-dismissible fade show alert-notification`;
+            notification.className = `alert alert-${type === 'success' ? 'success' : type === 'error' ? 'danger' : 'info'} alert-dismissible fade show`;
             notification.style.position = 'fixed';
             notification.style.top = '20px';
             notification.style.right = '20px';
@@ -1184,16 +972,13 @@
             notification.style.minWidth = '300px';
             notification.innerHTML = `
                 ${message}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" onclick="this.parentElement.remove()"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             `;
             
             document.body.appendChild(notification);
             
-            // Auto-remove after 5 seconds
             setTimeout(() => {
-                if (notification.parentElement) {
-                    notification.remove();
-                }
+                notification.remove();
             }, 5000);
         }
     </script>
