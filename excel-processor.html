@@ -262,7 +262,7 @@
                                         <li>Supported columns: Tower, Flat, Date fields</li>
                                         <li>Maximum file size: 10MB</li>
                                         <li>Maximum rows: 10,000</li>
-                                        <li>Date format: YYYY-MM-DD or DD/MM/YYYY</li>
+                                        <li>Date format: DD.MM.YYYY (e.g., 01.01.2025)</li>
                                     </ul>
                                 </div>
                             </div>
@@ -962,7 +962,7 @@
                     if (header.toLowerCase().includes('date') && row[index]) {
                         const dateStr = row[index].toString();
                         if (!isValidDate(dateStr)) {
-                            rowErrors.push(`Invalid date format '${dateStr}' in row ${i+1}, column '${header}'. Use YYYY-MM-DD or DD/MM/YYYY.`);
+                            rowErrors.push(`Invalid date format '${dateStr}' in row ${i+1}, column '${header}'. Use DD.MM.YYYY (e.g., 01.01.2025).`);
                         }
                     }
                 });
@@ -979,16 +979,11 @@
             updateValidationUI();
         }
         
-        // Check if date is valid
+        // Check if date is valid - STRICTLY DD.MM.YYYY format (01.01.2025)
         function isValidDate(dateString) {
-            // Try multiple date formats
-            const formats = [
-                /^\d{4}-\d{2}-\d{2}$/, // YYYY-MM-DD
-                /^\d{2}\/\d{2}\/\d{4}$/, // DD/MM/YYYY
-                /^\d{2}-\d{2}-\d{4}$/ // DD-MM-YYYY
-            ];
-            
-            return formats.some(format => format.test(dateString));
+            // Strictly use DD.MM.YYYY format (01.01.2025)
+            const format = /^\d{2}\.\d{2}\.\d{4}$/; // DD.MM.YYYY
+            return format.test(dateString);
         }
         
         // Update validation UI
@@ -1506,14 +1501,14 @@
                 case 'key_handover':
                     templateData = [
                         ['Tower', 'Flat', 'Handover_Person', 'Handover_Date', 'Incomplete_Keys', 'Remarks', 'Status'],
-                        ['A', '1503', 'John Doe', '2023-10-15', 'NO', 'All keys received', 'completed'],
-                        ['B', '2207', 'Jane Smith', '2023-10-16', 'YES', 'Missing main door key', 'completed'],
-                        ['C', '0905', 'Mike Johnson', '2023-10-17', 'NO', 'All keys handed over', 'completed'],
+                        ['A', '1503', 'John Doe', '01.01.2025', 'NO', 'All keys received', 'completed'],
+                        ['B', '2207', 'Jane Smith', '02.01.2025', 'YES', 'Missing main door key', 'completed'],
+                        ['C', '0905', 'Mike Johnson', '03.01.2025', 'NO', 'All keys handed over', 'completed'],
                         ['', '', '', '', '', '', ''],
                         ['Instructions:', '', '', '', '', '', ''],
                         ['1. Fill in data starting from row 2', '', '', '', '', '', ''],
                         ['2. Keep column headers exactly as shown', '', '', '', '', '', ''],
-                        ['3. Date format: YYYY-MM-DD', '', '', '', '', '', ''],
+                        ['3. Date format: DD.MM.YYYY (e.g., 01.01.2025)', '', '', '', '', '', ''],
                         ['4. Status: completed/pending/delayed', '', '', '', '', '', '']
                     ];
                     filename = 'key_handover_template.xlsx';
@@ -1522,14 +1517,14 @@
                 case 'snagging':
                     templateData = [
                         ['Tower', 'Flat', 'Inspector', 'Start_Date', 'End_Date', 'Followup_Date', 'MEP_Completed', 'Civil_Completed', 'Electrical_Completed', 'Water_Completed', 'AC_Drain_Completed', 'Tiles_Completed', 'Remarks', 'Status'],
-                        ['A', '1503', 'Mike Johnson', '2023-10-15', '2023-10-22', '2023-10-25', 'YES', 'YES', 'NO', 'YES', 'YES', 'YES', 'Electrical pending', 'completed'],
-                        ['C', '0905', 'Sarah Wilson', '2023-10-16', '2023-10-23', '2023-10-26', 'YES', 'NO', 'YES', 'YES', 'YES', 'NO', 'Civil work needed', 'pending'],
-                        ['B', '2207', 'Alex Chen', '2023-10-17', '2023-10-24', '2023-10-27', 'YES', 'YES', 'YES', 'YES', 'NO', 'YES', 'AC drain issues', 'delayed'],
+                        ['A', '1503', 'Mike Johnson', '01.01.2025', '08.01.2025', '11.01.2025', 'YES', 'YES', 'NO', 'YES', 'YES', 'YES', 'Electrical pending', 'completed'],
+                        ['C', '0905', 'Sarah Wilson', '02.01.2025', '09.01.2025', '12.01.2025', 'YES', 'NO', 'YES', 'YES', 'YES', 'NO', 'Civil work needed', 'pending'],
+                        ['B', '2207', 'Alex Chen', '03.01.2025', '10.01.2025', '13.01.2025', 'YES', 'YES', 'YES', 'YES', 'NO', 'YES', 'AC drain issues', 'delayed'],
                         ['', '', '', '', '', '', '', '', '', '', '', '', '', ''],
                         ['Instructions:', '', '', '', '', '', '', '', '', '', '', '', '', ''],
                         ['1. Fill in data starting from row 2', '', '', '', '', '', '', '', '', '', '', '', '', ''],
                         ['2. YES/NO fields: Use YES or NO only', '', '', '', '', '', '', '', '', '', '', '', '', ''],
-                        ['3. Date format: YYYY-MM-DD', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+                        ['3. Date format: DD.MM.YYYY (e.g., 01.01.2025)', '', '', '', '', '', '', '', '', '', '', '', '', ''],
                         ['4. Status: completed/pending/delayed', '', '', '', '', '', '', '', '', '', '', '', '', '']
                     ];
                     filename = 'snagging_template.xlsx';
@@ -1538,14 +1533,14 @@
                 case 'first_visit':
                     templateData = [
                         ['Tower', 'Flat', 'Owner_Name', 'Owner_Phone', 'Visit_Date', 'HOT_Member', 'Handover_Suggested', 'Customer_Remarks', 'CRM_NOC', 'Status'],
-                        ['B', '2207', 'Robert Brown', '9876543210', '2023-10-20 14:30', 'Alex Chen', '2023-10-25 10:00', 'Customer satisfied', 'YES', 'completed'],
-                        ['A', '1806', 'Emily Davis', '8765432109', '2023-10-21 11:00', 'Sam Wilson', '', 'Rescue flat - special handling', 'NO', 'completed'],
-                        ['C', '0905', 'David Wilson', '7654321098', '2023-10-22 15:00', 'Lisa Wang', '2023-10-28 09:30', 'Minor issues noted', 'YES', 'completed'],
+                        ['B', '2207', 'Robert Brown', '9876543210', '01.01.2025 14:30', 'Alex Chen', '06.01.2025 10:00', 'Customer satisfied', 'YES', 'completed'],
+                        ['A', '1806', 'Emily Davis', '8765432109', '02.01.2025 11:00', 'Sam Wilson', '', 'Rescue flat - special handling', 'NO', 'completed'],
+                        ['C', '0905', 'David Wilson', '7654321098', '03.01.2025 15:00', 'Lisa Wang', '08.01.2025 09:30', 'Minor issues noted', 'YES', 'completed'],
                         ['', '', '', '', '', '', '', '', '', ''],
                         ['Instructions:', '', '', '', '', '', '', '', '', ''],
                         ['1. Fill in data starting from row 2', '', '', '', '', '', '', '', '', ''],
                         ['2. Phone: 10-digit mobile number', '', '', '', '', '', '', '', '', ''],
-                        ['3. Date format: YYYY-MM-DD HH:MM', '', '', '', '', '', '', '', '', ''],
+                        ['3. Date format: DD.MM.YYYY HH:MM', '', '', '', '', '', '', '', '', ''],
                         ['4. CRM NOC: YES or NO', '', '', '', '', '', '', '', '', '']
                     ];
                     filename = 'first_visit_template.xlsx';
@@ -1554,14 +1549,14 @@
                 case 'handover':
                     templateData = [
                         ['Tower', 'Flat', 'Customer_Name', 'Second_Owner', 'Owner_Email', 'Second_Owner_Email', 'HOTO_Member', 'Handover_Date', 'Keys_Handed', 'Manual_Handed', 'Gift_Box_Handed', 'Customer_Feedback', 'Status'],
-                        ['A', '1503', 'Robert Brown', '', 'robert@email.com', '', 'Alex Chen', '2023-10-25 10:00', 'YES', 'YES', 'YES', 'Very satisfied with the handover process', 'completed'],
-                        ['B', '2207', 'Emily Davis', 'John Davis', 'emily@email.com', 'john@email.com', 'Sam Wilson', '2023-10-26 11:00', 'YES', 'YES', 'NO', 'Gift box to be delivered next week', 'pending'],
-                        ['C', '0905', 'David Wilson', '', 'david@email.com', '', 'Lisa Wang', '2023-10-28 09:30', 'YES', 'YES', 'YES', 'All documents received', 'completed'],
+                        ['A', '1503', 'Robert Brown', '', 'robert@email.com', '', 'Alex Chen', '06.01.2025 10:00', 'YES', 'YES', 'YES', 'Very satisfied with the handover process', 'completed'],
+                        ['B', '2207', 'Emily Davis', 'John Davis', 'emily@email.com', 'john@email.com', 'Sam Wilson', '07.01.2025 11:00', 'YES', 'YES', 'NO', 'Gift box to be delivered next week', 'pending'],
+                        ['C', '0905', 'David Wilson', '', 'david@email.com', '', 'Lisa Wang', '08.01.2025 09:30', 'YES', 'YES', 'YES', 'All documents received', 'completed'],
                         ['', '', '', '', '', '', '', '', '', '', '', '', ''],
                         ['Instructions:', '', '', '', '', '', '', '', '', '', '', '', ''],
                         ['1. Fill in data starting from row 2', '', '', '', '', '', '', '', '', '', '', '', ''],
                         ['2. Email: Valid email addresses', '', '', '', '', '', '', '', '', '', '', '', ''],
-                        ['3. Date format: YYYY-MM-DD HH:MM', '', '', '', '', '', '', '', '', '', '', '', ''],
+                        ['3. Date format: DD.MM.YYYY HH:MM', '', '', '', '', '', '', '', '', '', '', '', ''],
                         ['4. YES/NO fields: Use YES or NO only', '', '', '', '', '', '', '', '', '', '', '', '']
                     ];
                     filename = 'handover_template.xlsx';
@@ -1570,14 +1565,14 @@
                 case 'interiors':
                     templateData = [
                         ['Tower', 'Flat', 'Start_Date', 'End_Date', 'Contractor_Name', 'Contractor_Contact', 'Clearance_By', 'Flooring', 'Painting', 'Carpentry', 'Electrical', 'Plumbing', 'False_Ceiling', 'Remarks', 'Status'],
-                        ['A', '1503', '2023-10-30', '2023-11-30', 'Elite Interiors', '9876543210', 'Alex Chen', 'YES', 'YES', 'YES', 'NO', 'YES', 'NO', 'Electrical work will be done separately', 'started'],
-                        ['B', '2207', '2023-11-01', '2023-12-15', 'Premium Designs', '8765432109', 'Sam Wilson', 'YES', 'YES', 'YES', 'YES', 'YES', 'YES', 'Complete renovation', 'started'],
-                        ['C', '0905', '2023-11-05', '2023-12-10', 'Modern Interiors', '7654321098', 'Lisa Wang', 'NO', 'YES', 'NO', 'YES', 'NO', 'YES', 'Only painting and electrical work', 'started'],
+                        ['A', '1503', '01.01.2025', '01.02.2025', 'Elite Interiors', '9876543210', 'Alex Chen', 'YES', 'YES', 'YES', 'NO', 'YES', 'NO', 'Electrical work will be done separately', 'started'],
+                        ['B', '2207', '02.01.2025', '15.02.2025', 'Premium Designs', '8765432109', 'Sam Wilson', 'YES', 'YES', 'YES', 'YES', 'YES', 'YES', 'Complete renovation', 'started'],
+                        ['C', '0905', '05.01.2025', '10.02.2025', 'Modern Interiors', '7654321098', 'Lisa Wang', 'NO', 'YES', 'NO', 'YES', 'NO', 'YES', 'Only painting and electrical work', 'started'],
                         ['', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
                         ['Instructions:', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
                         ['1. Fill in data starting from row 2', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
                         ['2. Contact: 10-digit phone number', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
-                        ['3. Date format: YYYY-MM-DD', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+                        ['3. Date format: DD.MM.YYYY (e.g., 01.01.2025)', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
                         ['4. YES/NO fields: Use YES or NO only', '', '', '', '', '', '', '', '', '', '', '', '', '', '']
                     ];
                     filename = 'interior_work_template.xlsx';
@@ -1586,14 +1581,14 @@
                 case 'movein':
                     templateData = [
                         ['Tower', 'Flat', 'Customer_Name', 'Movein_Date', 'Contact_Number', 'Remarks', 'Status'],
-                        ['A', '1503', 'Robert Brown', '2023-12-01 10:00', '9876543210', 'All furniture moved in', 'completed'],
-                        ['B', '2207', 'Emily Davis', '2023-12-20 14:00', '8765432109', 'Rescue flat - special arrangements made', 'completed'],
-                        ['C', '0905', 'David Wilson', '2023-12-15 09:00', '7654321098', 'Early morning move-in requested', 'completed'],
+                        ['A', '1503', 'Robert Brown', '01.01.2025 10:00', '9876543210', 'All furniture moved in', 'completed'],
+                        ['B', '2207', 'Emily Davis', '20.01.2025 14:00', '8765432109', 'Rescue flat - special arrangements made', 'completed'],
+                        ['C', '0905', 'David Wilson', '15.01.2025 09:00', '7654321098', 'Early morning move-in requested', 'completed'],
                         ['', '', '', '', '', '', ''],
                         ['Instructions:', '', '', '', '', '', ''],
                         ['1. Fill in data starting from row 2', '', '', '', '', '', ''],
                         ['2. Contact: 10-digit phone number', '', '', '', '', '', ''],
-                        ['3. Date format: YYYY-MM-DD HH:MM', '', '', '', '', '', ''],
+                        ['3. Date format: DD.MM.YYYY HH:MM', '', '', '', '', '', ''],
                         ['4. Status: completed/pending', '', '', '', '', '', '']
                     ];
                     filename = 'movein_template.xlsx';
