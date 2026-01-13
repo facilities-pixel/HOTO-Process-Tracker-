@@ -173,6 +173,30 @@
             50% { opacity: 0.5; }
             100% { opacity: 1; }
         }
+        
+        .debug-box {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 10px;
+            margin-top: 10px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .debug-info {
+            color: #0d6efd;
+        }
+        
+        .debug-error {
+            color: #dc3545;
+        }
+        
+        .debug-success {
+            color: #198754;
+        }
     </style>
 </head>
 <body>
@@ -189,42 +213,93 @@
             measurementId: "G-7KWHXLSP2J"
         };
         
-        // Initialize Firebase
-        try {
-            firebase.initializeApp(firebaseConfig);
-            const db = firebase.firestore();
-            const auth = firebase.auth();
-            
-            // Enable offline persistence
-            db.enablePersistence()
-                .catch((err) => {
-                    console.warn("Firebase offline persistence not supported:", err.code);
-                });
-            
-            // Initialize with anonymous auth
-            auth.signInAnonymously()
-                .then(() => {
-                    console.log("Anonymous authentication successful");
-                    updateConnectionStatus(true);
-                })
-                .catch(function(error) {
-                    console.error("Auth error:", error);
-                    updateConnectionStatus(false);
-                });
-        } catch (error) {
-            console.error("Firebase initialization error:", error);
-            showNotification("Firebase initialization failed. Check console for details.", "error");
+        // Global Firebase variables
+        let db = null;
+        let auth = null;
+        let firebaseInitialized = false;
+        
+        // Initialize Firebase with better error handling
+        function initializeFirebase() {
+            try {
+                // Check if Firebase is already initialized
+                if (firebase.apps.length === 0) {
+                    const app = firebase.initializeApp(firebaseConfig);
+                    console.log("Firebase app initialized:", app.name);
+                } else {
+                    console.log("Firebase app already initialized");
+                }
+                
+                // Initialize services
+                db = firebase.firestore();
+                auth = firebase.auth();
+                firebaseInitialized = true;
+                
+                console.log("Firebase services initialized");
+                logDebug("Firebase initialized successfully", "success");
+                
+                // Enable offline persistence
+                db.enablePersistence()
+                    .then(() => {
+                        console.log("Firebase offline persistence enabled");
+                        logDebug("Offline persistence enabled", "success");
+                    })
+                    .catch((err) => {
+                        console.warn("Firebase offline persistence not supported:", err.code);
+                        logDebug("Offline persistence not available: " + err.code, "info");
+                    });
+                
+                // Initialize with anonymous auth
+                auth.signInAnonymously()
+                    .then(() => {
+                        console.log("Anonymous authentication successful");
+                        logDebug("Anonymous auth successful", "success");
+                        updateConnectionStatus(true);
+                        showNotification("Firebase connected successfully!", "success");
+                        
+                        // Update Firebase status in UI
+                        document.getElementById('firebaseConnectionStatus').className = 'test-status test-success';
+                        document.getElementById('firebaseConnectionStatus').textContent = 'Connected';
+                        document.getElementById('firebaseTestStatus').className = 'test-status test-success';
+                        document.getElementById('firebaseTestStatus').textContent = 'Connected';
+                    })
+                    .catch(function(error) {
+                        console.error("Auth error:", error);
+                        logDebug("Auth error: " + error.message, "error");
+                        updateConnectionStatus(false);
+                        showNotification("Firebase auth error: " + error.message, "error");
+                    });
+                    
+            } catch (error) {
+                console.error("Firebase initialization error:", error);
+                firebaseInitialized = false;
+                logDebug("Firebase init error: " + error.message, "error");
+                showNotification("Firebase initialization failed: " + error.message, "error");
+            }
+        }
+        
+        // Debug logging
+        function logDebug(message, type = "info") {
+            const debugBox = document.getElementById('debugBox');
+            if (debugBox) {
+                const timestamp = new Date().toLocaleTimeString();
+                const colorClass = type === "error" ? "debug-error" : (type === "success" ? "debug-success" : "debug-info");
+                debugBox.innerHTML += `<div class="${colorClass}">[${timestamp}] ${message}</div>`;
+                debugBox.scrollTop = debugBox.scrollHeight;
+            }
+            console.log(`[${type.toUpperCase()}] ${message}`);
         }
         
         // Monitor online/offline status
         window.addEventListener('online', () => {
             updateConnectionStatus(true);
             showNotification("You're back online!", "success");
+            logDebug("Browser online", "success");
         });
         
         window.addEventListener('offline', () => {
             updateConnectionStatus(false);
             showNotification("You're offline. Some features may be limited.", "warning");
+            logDebug("Browser offline", "warning");
         });
         
         function updateConnectionStatus(isOnline) {
@@ -237,6 +312,13 @@
                 overallStatus.innerHTML = '<span class="connection-indicator connection-offline"></span> Offline';
             }
         }
+        
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log("Page loaded, initializing Firebase...");
+            logDebug("Page loaded, initializing Firebase...", "info");
+            initializeFirebase();
+        });
     </script>
     
     <div class="container-fluid">
@@ -310,6 +392,18 @@
                             <small>Firebase</small>
                         </div>
                     </div>
+                    
+                    <hr class="my-3">
+                    
+                    <div class="px-3">
+                        <h6 class="text-muted mb-2">Firebase Debug</h6>
+                        <button class="btn btn-sm btn-outline-info w-100 mb-2" onclick="reinitializeFirebase()">
+                            <i class="fas fa-redo"></i> Reinitialize Firebase
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary w-100" onclick="clearDebugLogs()">
+                            <i class="fas fa-broom"></i> Clear Debug Logs
+                        </button>
+                    </div>
                 </div>
             </div>
             
@@ -322,6 +416,47 @@
                     </div>
                     <div class="integration-status status-pending" id="overallStatus">
                         <span class="connection-indicator connection-online"></span> Checking...
+                    </div>
+                </div>
+                
+                <!-- Debug Panel -->
+                <div class="card integration-card mb-3">
+                    <div class="card-header d-flex align-items-center">
+                        <div class="integration-icon" style="background: #6c757d;">
+                            <i class="fas fa-bug"></i>
+                        </div>
+                        <div>
+                            <h5 class="mb-1">Firebase Debug Console</h5>
+                            <p class="text-muted mb-0">Debug Firebase connection issues</p>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Firebase Troubleshooting:</strong> If connection fails, check:
+                            <ol class="mb-0 mt-2">
+                                <li>Firebase Firestore is enabled in your Firebase Console</li>
+                                <li>Security rules allow anonymous access (if using anonymous auth)</li>
+                                <li>Your Firebase project exists and is properly configured</li>
+                                <li>Check browser console (F12) for detailed error messages</li>
+                            </ol>
+                        </div>
+                        
+                        <div class="debug-box" id="debugBox">
+                            <!-- Debug logs will appear here -->
+                        </div>
+                        
+                        <div class="mt-3">
+                            <button class="btn btn-primary" onclick="checkFirebaseSetup()">
+                                <i class="fas fa-check-circle"></i> Check Firebase Setup
+                            </button>
+                            <button class="btn btn-warning ms-2" onclick="testFirebaseAuth()">
+                                <i class="fas fa-user-shield"></i> Test Authentication
+                            </button>
+                            <button class="btn btn-info ms-2" onclick="testFirestoreAccess()">
+                                <i class="fas fa-database"></i> Test Firestore Access
+                            </button>
+                        </div>
                     </div>
                 </div>
                 
@@ -339,16 +474,30 @@
                     <div class="card-body">
                         <div class="row">
                             <div class="col-md-8">
-                                <div class="alert alert-success alert-dismissible fade show" role="alert">
-                                    <i class="fas fa-check-circle me-2"></i>
-                                    <strong>Success!</strong> Firebase configuration loaded successfully for project: <strong>hotoprocess</strong>
-                                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                                </div>
-                                
                                 <div class="mb-3">
-                                    <label class="form-label">Firebase Project ID</label>
-                                    <input type="text" class="form-control" value="hotoprocess" readonly>
-                                    <small class="text-muted">Project is currently using Firebase for real-time sync</small>
+                                    <label class="form-label">Firebase Project Configuration</label>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-bordered">
+                                            <tbody>
+                                                <tr>
+                                                    <td><strong>Project ID</strong></td>
+                                                    <td>hotoprocess</td>
+                                                </tr>
+                                                <tr>
+                                                    <td><strong>Auth Domain</strong></td>
+                                                    <td>hotoprocess.firebaseapp.com</td>
+                                                </tr>
+                                                <tr>
+                                                    <td><strong>Database URL</strong></td>
+                                                    <td>https://hotoprocess.firebaseio.com</td>
+                                                </tr>
+                                                <tr>
+                                                    <td><strong>Storage Bucket</strong></td>
+                                                    <td>hotoprocess.firebasestorage.app</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
                                 
                                 <div class="row">
@@ -446,6 +595,11 @@
                                 <div class="mt-2">
                                     <small class="text-muted d-block">Data Security:</small>
                                     <span>Anonymous Auth</span>
+                                </div>
+                                
+                                <div class="mt-2">
+                                    <small class="text-muted d-block">Firebase Status:</small>
+                                    <span id="firebaseInitStatus">Not Initialized</span>
                                 </div>
                             </div>
                         </div>
@@ -805,17 +959,146 @@
             loadSyncLogs();
             updateSyncStats();
             loadBackupList();
-            loadFirebaseStats();
             
-            // Setup auto-refresh for Firebase stats
-            setInterval(loadFirebaseStats, 30000);
-            
-            // Test Firebase connection on load
-            setTimeout(testFirebaseConnection, 1000);
+            // Setup auto-refresh for Firebase stats if connected
+            setInterval(() => {
+                if (firebaseInitialized) {
+                    loadFirebaseStats();
+                }
+            }, 30000);
         });
+        
+        // Reinitialize Firebase
+        function reinitializeFirebase() {
+            logDebug("Reinitializing Firebase...", "info");
+            initializeFirebase();
+        }
+        
+        // Clear debug logs
+        function clearDebugLogs() {
+            document.getElementById('debugBox').innerHTML = '';
+            logDebug("Debug logs cleared", "info");
+        }
+        
+        // Check Firebase setup
+        async function checkFirebaseSetup() {
+            logDebug("Checking Firebase setup...", "info");
+            
+            try {
+                // Test if Firebase is loaded
+                if (typeof firebase === 'undefined') {
+                    logDebug("Firebase SDK not loaded", "error");
+                    showNotification("Firebase SDK not loaded. Check CDN connection.", "error");
+                    return;
+                }
+                
+                logDebug("Firebase SDK loaded: " + firebase.SDK_VERSION, "success");
+                
+                // Check Firebase config
+                logDebug("Checking Firebase configuration...", "info");
+                logDebug("Project ID: " + firebaseConfig.projectId, "info");
+                logDebug("API Key: " + firebaseConfig.apiKey.substring(0, 10) + "...", "info");
+                
+                // Test Firestore access
+                await testFirestoreAccess();
+                
+            } catch (error) {
+                logDebug("Setup check error: " + error.message, "error");
+            }
+        }
+        
+        // Test Firebase authentication
+        async function testFirebaseAuth() {
+            logDebug("Testing Firebase authentication...", "info");
+            
+            try {
+                if (!auth) {
+                    logDebug("Auth service not initialized", "error");
+                    return;
+                }
+                
+                // Get current user
+                const currentUser = auth.currentUser;
+                if (currentUser) {
+                    logDebug("Current user: " + currentUser.uid + " (anonymous: " + currentUser.isAnonymous + ")", "success");
+                } else {
+                    logDebug("No user logged in, attempting anonymous auth...", "info");
+                    
+                    // Try anonymous auth
+                    const result = await auth.signInAnonymously();
+                    logDebug("Anonymous auth successful: " + result.user.uid, "success");
+                    showNotification("Firebase authentication successful!", "success");
+                }
+                
+            } catch (error) {
+                logDebug("Auth test error: " + error.message + " (code: " + error.code + ")", "error");
+                showNotification("Firebase auth error: " + error.message, "error");
+            }
+        }
+        
+        // Test Firestore access
+        async function testFirestoreAccess() {
+            logDebug("Testing Firestore access...", "info");
+            
+            try {
+                if (!db) {
+                    logDebug("Firestore service not initialized", "error");
+                    return;
+                }
+                
+                // Try to access a test document
+                const testDocRef = db.collection('test_collection').doc('test_document');
+                
+                // Try to set a test document
+                await testDocRef.set({
+                    test: true,
+                    timestamp: new Date().toISOString()
+                });
+                
+                logDebug("Firestore write successful", "success");
+                
+                // Try to read it back
+                const doc = await testDocRef.get();
+                if (doc.exists) {
+                    logDebug("Firestore read successful", "success");
+                }
+                
+                // Clean up test document
+                await testDocRef.delete();
+                logDebug("Test document cleaned up", "info");
+                
+                showNotification("Firestore access successful!", "success");
+                
+            } catch (error) {
+                logDebug("Firestore access error: " + error.message + " (code: " + error.code + ")", "error");
+                
+                // Provide specific guidance based on error code
+                if (error.code === 'permission-denied') {
+                    logDebug("Permission denied. Check Firestore security rules:", "error");
+                    logDebug("Enable anonymous auth in Firestore rules:", "error");
+                    logDebug("rules_version = '2';", "info");
+                    logDebug("service cloud.firestore {", "info");
+                    logDebug("  match /databases/{database}/documents {", "info");
+                    logDebug("    match /{document=**} {", "info");
+                    logDebug("      allow read, write: if request.auth != null;", "info");
+                    logDebug("    }", "info");
+                    logDebug("  }", "info");
+                    logDebug("}", "info");
+                } else if (error.code === 'failed-precondition') {
+                    logDebug("Firestore database not created. Go to Firebase Console > Firestore > Create Database", "error");
+                }
+                
+                showNotification("Firestore access error: " + error.message, "error");
+            }
+        }
         
         // Load Firebase statistics
         async function loadFirebaseStats() {
+            if (!db) {
+                document.getElementById('firebaseRecordCount').value = "Firebase not initialized";
+                return;
+            }
+            
             try {
                 const snapshot = await db.collection('hot_process').get();
                 const count = snapshot.size;
@@ -839,10 +1122,12 @@
                 document.getElementById('firebaseSnagCount').textContent = snagCount;
                 document.getElementById('firebaseHandoverCount').textContent = handoverCount;
                 
+                logDebug("Firebase stats loaded: " + count + " records", "success");
+                
             } catch (error) {
                 console.error("Error loading Firebase stats:", error);
-                document.getElementById('firebaseRecordCount').value = "Error loading";
-                updateConnectionStatus(false);
+                document.getElementById('firebaseRecordCount').value = "Error: " + error.code;
+                logDebug("Error loading stats: " + error.message, "error");
             }
         }
         
@@ -861,7 +1146,12 @@
             progressBar.className = 'progress-bar bg-warning';
             
             try {
-                // Test Firebase connection
+                // Check if Firebase is initialized
+                if (!firebaseInitialized || !db) {
+                    throw new Error("Firebase not initialized");
+                }
+                
+                // Test Firestore connection
                 await db.collection('hot_process').limit(1).get();
                 
                 statusElement.className = 'test-status test-success';
@@ -871,10 +1161,13 @@
                 
                 document.getElementById('firebaseTestStatus').className = 'test-status test-success';
                 document.getElementById('firebaseTestStatus').textContent = 'Connected';
+                document.getElementById('firebaseInitStatus').textContent = 'Connected';
+                document.getElementById('firebaseInitStatus').className = 'text-success';
                 
                 logSync('Firebase connection test successful', 'success');
                 showNotification('✓ Firebase connection successful!', 'success');
                 updateConnectionStatus(true);
+                logDebug("Firebase connection test passed", "success");
                 
             } catch (error) {
                 statusElement.className = 'test-status test-failed';
@@ -884,10 +1177,12 @@
                 
                 document.getElementById('firebaseTestStatus').className = 'test-status test-failed';
                 document.getElementById('firebaseTestStatus').textContent = 'Failed';
+                document.getElementById('firebaseInitStatus').textContent = 'Failed: ' + error.message;
+                document.getElementById('firebaseInitStatus').className = 'text-danger';
                 
                 logSync('Firebase connection test failed: ' + error.message, 'error');
-                showNotification('✗ Firebase connection failed', 'error');
-                updateConnectionStatus(false);
+                showNotification('✗ Firebase connection failed: ' + error.message, 'error');
+                logDebug("Firebase connection test failed: " + error.message, "error");
                 
             } finally {
                 btn.innerHTML = originalHTML;
@@ -911,8 +1206,13 @@
             btn.disabled = true;
             
             showNotification('Downloading data from Firebase...', 'info');
+            logDebug("Starting Firebase to Local sync", "info");
             
             try {
+                if (!db) {
+                    throw new Error("Firebase not initialized");
+                }
+                
                 const snapshot = await db.collection('hot_process').get();
                 
                 // Convert to local data structure
@@ -944,11 +1244,13 @@
                 
                 showNotification(`Downloaded ${snapshot.size} records from Firebase!`, 'success');
                 logSync(`Downloaded ${snapshot.size} records from Firebase`, 'success');
+                logDebug("Firebase to Local sync completed: " + snapshot.size + " records", "success");
                 
             } catch (error) {
                 console.error("Error syncing from Firebase:", error);
                 showNotification('Error downloading from Firebase: ' + error.message, 'error');
                 logSync('Error downloading from Firebase', 'error');
+                logDebug("Firebase to Local sync error: " + error.message, "error");
                 
             } finally {
                 btn.innerHTML = originalHTML;
@@ -965,8 +1267,13 @@
             btn.disabled = true;
             
             showNotification('Uploading local data to Firebase...', 'info');
+            logDebug("Starting Local to Firebase sync", "info");
             
             try {
+                if (!db) {
+                    throw new Error("Firebase not initialized");
+                }
+                
                 // Load from localStorage
                 const localData = JSON.parse(localStorage.getItem('hot_process_data') || '{"towers":{"A":{"flats":{}},"B":{"flats":{}},"C":{"flats":{}}}}');
                 
@@ -995,6 +1302,7 @@
                             
                         } catch (error) {
                             errors.push(`Flat ${flatId}: ${error.message}`);
+                            logDebug("Upload error for " + flatId + ": " + error.message, "error");
                         }
                     }
                 }
@@ -1007,6 +1315,7 @@
                 }
                 
                 logSync(`Uploaded ${uploadedCount} records to Firebase`, errors.length > 0 ? 'warning' : 'success');
+                logDebug("Local to Firebase sync completed: " + uploadedCount + " records uploaded", errors.length > 0 ? "warning" : "success");
                 
                 // Refresh stats
                 loadFirebaseStats();
@@ -1015,6 +1324,7 @@
                 console.error("Error syncing to Firebase:", error);
                 showNotification('Error uploading to Firebase: ' + error.message, 'error');
                 logSync('Error uploading to Firebase', 'error');
+                logDebug("Local to Firebase sync error: " + error.message, "error");
                 
             } finally {
                 btn.innerHTML = originalHTML;
@@ -1031,6 +1341,10 @@
             btn.disabled = true;
             
             try {
+                if (!db) {
+                    throw new Error("Firebase not initialized");
+                }
+                
                 const snapshot = await db.collection('hot_process').get();
                 
                 // Convert to array
@@ -1054,10 +1368,12 @@
                 
                 showNotification(`Exported ${data.length} records from Firebase`, 'success');
                 logSync('Firebase data exported', 'success');
+                logDebug("Firebase data exported: " + data.length + " records", "success");
                 
             } catch (error) {
                 console.error("Error exporting Firebase data:", error);
                 showNotification('Error exporting Firebase data: ' + error.message, 'error');
+                logDebug("Firebase export error: " + error.message, "error");
                 
             } finally {
                 btn.innerHTML = originalHTML;
@@ -1071,6 +1387,7 @@
                 if (confirm('Are you REALLY sure? This will delete ALL records permanently.')) {
                     showNotification('Data clearance requires admin privileges. Contact administrator.', 'error');
                     logSync('Attempted to clear Firebase data (blocked)', 'warning');
+                    logDebug("Firebase data clear attempted (blocked)", "warning");
                 }
             }
         }
@@ -1318,12 +1635,37 @@
                 // Get format
                 const format = document.getElementById('exportFormat').value;
                 
-                // Get data from Firebase
-                const snapshot = await db.collection('hot_process').get();
-                const data = [];
-                snapshot.forEach(doc => {
-                    data.push(doc.data());
-                });
+                // Try to get data from Firebase first
+                let data = [];
+                
+                if (firebaseInitialized && db) {
+                    try {
+                        const snapshot = await db.collection('hot_process').get();
+                        snapshot.forEach(doc => {
+                            data.push(doc.data());
+                        });
+                    } catch (firebaseError) {
+                        console.warn("Firebase export failed, trying localStorage:", firebaseError);
+                        // Fall back to localStorage
+                        const localData = JSON.parse(localStorage.getItem('hot_process_data') || '{"towers":{"A":{"flats":{}},"B":{"flats":{}},"C":{"flats":{}}}}');
+                        // Extract data from localStorage structure
+                        for (const tower of ['A', 'B', 'C']) {
+                            const flats = localData.towers[tower]?.flats || {};
+                            Object.values(flats).forEach(flat => {
+                                data.push(flat);
+                            });
+                        }
+                    }
+                } else {
+                    // Use localStorage only
+                    const localData = JSON.parse(localStorage.getItem('hot_process_data') || '{"towers":{"A":{"flats":{}},"B":{"flats":{}},"C":{"flats":{}}}}');
+                    for (const tower of ['A', 'B', 'C']) {
+                        const flats = localData.towers[tower]?.flats || {};
+                        Object.values(flats).forEach(flat => {
+                            data.push(flat);
+                        });
+                    }
+                }
                 
                 let dataStr, filename, mimeType;
                 
