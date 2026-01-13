@@ -6,7 +6,9 @@
     <title>Excel Import - HOT Process</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- REMOVED FIREBASE SCRIPTS -->
     <style>
+        /* KEEP ALL YOUR EXISTING CSS STYLES EXACTLY AS THEY ARE */
         .upload-area {
             border: 3px dashed #dee2e6;
             border-radius: 10px;
@@ -175,9 +177,50 @@
         .step.completed .step-label {
             color: #198754;
         }
+        
+        /* NEW: Sync status indicator */
+        .sync-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        
+        .sync-online {
+            background: #28a745;
+            animation: pulse 2s infinite;
+        }
+        
+        .sync-offline {
+            background: #dc3545;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        /* NEW: Import mode selector */
+        .import-mode-selector {
+            background: #e7f1ff;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
     </style>
 </head>
 <body>
+    <!-- GOOGLE APPS SCRIPT CONFIGURATION - ADDED -->
+    <script>
+        const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwRWU5znq3r653lh1qtPa6YDVtkxy77WO0nQ8uyrDF4qL-Dxay4Jim01aLMGtLzXj-M6g/exec';
+        let deviceId = localStorage.getItem('hot_device_id') || 'device_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem('hot_device_id', deviceId);
+        let isOnline = navigator.onLine;
+        let pendingImports = JSON.parse(localStorage.getItem('hot_pending_imports') || '[]');
+    </script>
+
     <!-- Sheet Selection Modal -->
     <div class="modal fade" id="sheetModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
@@ -200,16 +243,40 @@
     <div class="container-fluid py-4">
         <div class="row">
             <div class="col-lg-10 mx-auto">
-                <!-- Header -->
+                <!-- Header with sync status - MODIFIED -->
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <div>
                         <h2><i class="fas fa-file-excel text-success"></i> Excel Data Import</h2>
                         <p class="text-muted">Import data from Excel/CSV files to HOT Process System</p>
                     </div>
-                    <div>
+                    <div class="d-flex align-items-center">
+                        <div class="me-3" id="syncStatus">
+                            <span class="sync-indicator sync-online"></span> Online
+                        </div>
                         <a href="index.html" class="btn btn-outline-primary">
                             <i class="fas fa-arrow-left"></i> Back to Dashboard
                         </a>
+                    </div>
+                </div>
+                
+                <!-- Import Mode Selector - ADDED -->
+                <div class="import-mode-selector">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="syncToCloud" checked>
+                                <label class="form-check-label" for="syncToCloud">
+                                    <strong>Sync to Google Apps Script (Recommended)</strong> - Data will be saved to cloud for cross-device access
+                                </label>
+                            </div>
+                            <small class="text-muted">If offline, data will be queued and synced when back online</small>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <button class="btn btn-sm btn-outline-info" onclick="syncPendingImports()">
+                                <i class="fas fa-sync"></i> Sync Pending Imports
+                                <span class="badge bg-danger" id="pendingImportCount" style="display: none;">0</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
                 
@@ -262,7 +329,7 @@
                                         <li>Supported columns: Tower, Flat, Date fields</li>
                                         <li>Maximum file size: 10MB</li>
                                         <li>Maximum rows: 10,000</li>
-                                        <li>Date format: DD.MM.YYYY (e.g., 01.01.2025)</li>
+                                        <li><strong>Date format: DD.MM.YYYY (e.g., 01.01.2025)</strong></li>
                                     </ul>
                                 </div>
                             </div>
@@ -322,9 +389,9 @@
                                 <div class="mb-3">
                                     <label class="form-label">Select Data Type</label>
                                     <select class="form-select" id="dataType" onchange="updateFieldOptions()">
-                                        <option value="key_handover">Key Handover Data</option>
+                                        <option value="keyHandover">Key Handover Data</option>
                                         <option value="snagging">Snagging Data</option>
-                                        <option value="first_visit">First Visit Data</option>
+                                        <option value="firstVisit">First Visit Data</option>
                                         <option value="handover">Handover Data</option>
                                         <option value="interiors">Interior Work Data</option>
                                         <option value="movein">Move-in Data</option>
@@ -546,7 +613,7 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script>
-        // Excel Processor JavaScript
+        // Excel Processor JavaScript with Google Apps Script Integration
         let excelData = null;
         let columnMapping = {};
         let importLog = [];
@@ -556,97 +623,91 @@
         let importCanceled = false;
         let currentWorkbook = null;
         
-        // Field options for each data type
+        // Field options for each data type - UPDATED to match data entry structure
         const fieldOptionsData = {
-            key_handover: [
+            keyHandover: [
                 { value: '', label: '-- Ignore Column --' },
                 { value: 'tower', label: 'Tower (A, B, C)', required: true },
                 { value: 'flat', label: 'Flat Number', required: true },
-                { value: 'handover_person', label: 'Handover Person', required: true },
-                { value: 'handover_date', label: 'Handover Date', required: true },
-                { value: 'incomplete_keys', label: 'Incomplete Keys (YES/NO)' },
-                { value: 'key_remarks', label: 'Key Remarks' },
-                { value: 'status', label: 'Status' },
-                { value: 'timestamp', label: 'Timestamp' }
+                { value: 'person', label: 'Handover Person', required: true },
+                { value: 'date', label: 'Handover Date', required: true },
+                { value: 'incompleteKeys', label: 'Incomplete Keys (YES/NO)' },
+                { value: 'remarks', label: 'Key Remarks' },
+                { value: 'status', label: 'Status' }
             ],
             snagging: [
                 { value: '', label: '-- Ignore Column --' },
                 { value: 'tower', label: 'Tower (A, B, C)', required: true },
                 { value: 'flat', label: 'Flat Number', required: true },
                 { value: 'inspector', label: 'Inspector Name', required: true },
-                { value: 'start_date', label: 'Start Date', required: true },
-                { value: 'end_date', label: 'End Date' },
-                { value: 'followup_date', label: 'Follow-up Date' },
-                { value: 'mep_completed', label: 'MEP Completed (YES/NO)' },
-                { value: 'civil_completed', label: 'Civil Completed (YES/NO)' },
-                { value: 'electrical_completed', label: 'Electrical Completed (YES/NO)' },
-                { value: 'water_completed', label: 'Water & Slopes Completed (YES/NO)' },
-                { value: 'ac_drain_completed', label: 'AC Drain Completed (YES/NO)' },
-                { value: 'tiles_completed', label: 'Tiles Completed (YES/NO)' },
-                { value: 'snag_remarks', label: 'Snag Remarks' },
-                { value: 'status', label: 'Status' },
-                { value: 'timestamp', label: 'Timestamp' }
+                { value: 'startDate', label: 'Start Date', required: true },
+                { value: 'endDate', label: 'End Date' },
+                { value: 'followupDate', label: 'Follow-up Date' },
+                { value: 'mepCompleted', label: 'MEP Completed (YES/NO)' },
+                { value: 'civilCompleted', label: 'Civil Completed (YES/NO)' },
+                { value: 'electricalCompleted', label: 'Electrical Completed (YES/NO)' },
+                { value: 'waterCompleted', label: 'Water & Slopes Completed (YES/NO)' },
+                { value: 'acDrainCompleted', label: 'AC Drain Completed (YES/NO)' },
+                { value: 'tilesCompleted', label: 'Tiles Completed (YES/NO)' },
+                { value: 'remarks', label: 'Snag Remarks' },
+                { value: 'status', label: 'Status' }
             ],
-            first_visit: [
+            firstVisit: [
                 { value: '', label: '-- Ignore Column --' },
                 { value: 'tower', label: 'Tower (A, B, C)', required: true },
                 { value: 'flat', label: 'Flat Number', required: true },
-                { value: 'owner_name', label: 'Owner Name', required: true },
-                { value: 'owner_phone', label: 'Owner Phone', required: true },
-                { value: 'visit_date', label: 'Visit Date & Time', required: true },
-                { value: 'hot_member', label: 'HOT Team Member', required: true },
-                { value: 'handover_suggested', label: 'Handover Date Suggested' },
-                { value: 'customer_remarks', label: 'Customer Remarks' },
-                { value: 'crm_noc', label: 'CRM NOC (YES/NO)' },
-                { value: 'status', label: 'Status' },
-                { value: 'timestamp', label: 'Timestamp' }
+                { value: 'ownerName', label: 'Owner Name', required: true },
+                { value: 'ownerPhone', label: 'Owner Phone', required: true },
+                { value: 'date', label: 'Visit Date & Time', required: true },
+                { value: 'hotMember', label: 'HOT Team Member', required: true },
+                { value: 'handoverSuggested', label: 'Handover Date Suggested' },
+                { value: 'remarks', label: 'Customer Remarks' },
+                { value: 'crmNOC', label: 'CRM NOC (YES/NO)' },
+                { value: 'status', label: 'Status' }
             ],
             handover: [
                 { value: '', label: '-- Ignore Column --' },
                 { value: 'tower', label: 'Tower (A, B, C)', required: true },
                 { value: 'flat', label: 'Flat Number', required: true },
-                { value: 'customer_name', label: 'Customer Name', required: true },
-                { value: 'second_owner', label: 'Second Owner Name' },
-                { value: 'owner_email', label: 'Owner Email Address', required: true },
-                { value: 'second_owner_email', label: 'Second Owner Email' },
-                { value: 'hoto_member', label: 'HOTO Team Member', required: true },
-                { value: 'handover_date', label: 'Handover Date & Time', required: true },
-                { value: 'keys_handed', label: 'All Keys Handed (YES/NO)' },
-                { value: 'manual_handed', label: 'Handover Book Handed (YES/NO)' },
-                { value: 'gift_box_handed', label: 'Gift Box Handed (YES/NO)' },
-                { value: 'customer_feedback', label: 'Customer Feedback' },
-                { value: 'status', label: 'Status' },
-                { value: 'timestamp', label: 'Timestamp' }
+                { value: 'customerName', label: 'Customer Name', required: true },
+                { value: 'secondOwner', label: 'Second Owner Name' },
+                { value: 'ownerEmail', label: 'Owner Email Address', required: true },
+                { value: 'secondOwnerEmail', label: 'Second Owner Email' },
+                { value: 'hotoMember', label: 'HOTO Team Member', required: true },
+                { value: 'date', label: 'Handover Date & Time', required: true },
+                { value: 'keysHanded', label: 'All Keys Handed (YES/NO)' },
+                { value: 'manualHanded', label: 'Handover Book Handed (YES/NO)' },
+                { value: 'giftBoxHanded', label: 'Gift Box Handed (YES/NO)' },
+                { value: 'feedback', label: 'Customer Feedback' },
+                { value: 'status', label: 'Status' }
             ],
             interiors: [
                 { value: '', label: '-- Ignore Column --' },
                 { value: 'tower', label: 'Tower (A, B, C)', required: true },
                 { value: 'flat', label: 'Flat Number', required: true },
-                { value: 'start_date', label: 'Start Date', required: true },
-                { value: 'end_date', label: 'Expected End Date' },
-                { value: 'contractor_name', label: 'Contractor Name', required: true },
-                { value: 'contractor_contact', label: 'Contractor Contact' },
-                { value: 'clearance_by', label: 'Clearance By' },
+                { value: 'startDate', label: 'Start Date', required: true },
+                { value: 'endDate', label: 'Expected End Date' },
+                { value: 'contractorName', label: 'Contractor Name', required: true },
+                { value: 'contractorContact', label: 'Contractor Contact' },
+                { value: 'clearanceBy', label: 'Clearance By' },
                 { value: 'flooring', label: 'Flooring (YES/NO)' },
                 { value: 'painting', label: 'Painting (YES/NO)' },
                 { value: 'carpentry', label: 'Carpentry (YES/NO)' },
                 { value: 'electrical', label: 'Electrical (YES/NO)' },
                 { value: 'plumbing', label: 'Plumbing (YES/NO)' },
-                { value: 'false_ceiling', label: 'False Ceiling (YES/NO)' },
-                { value: 'interior_remarks', label: 'Remarks' },
-                { value: 'status', label: 'Status' },
-                { value: 'timestamp', label: 'Timestamp' }
+                { value: 'falseCeiling', label: 'False Ceiling (YES/NO)' },
+                { value: 'remarks', label: 'Remarks' },
+                { value: 'status', label: 'Status' }
             ],
             movein: [
                 { value: '', label: '-- Ignore Column --' },
                 { value: 'tower', label: 'Tower (A, B, C)', required: true },
                 { value: 'flat', label: 'Flat Number', required: true },
-                { value: 'customer_name', label: 'Customer Name', required: true },
-                { value: 'movein_date', label: 'Move-in Date & Time', required: true },
-                { value: 'contact_number', label: 'Contact Number' },
-                { value: 'movein_remarks', label: 'Remarks/Special Instructions' },
-                { value: 'status', label: 'Status' },
-                { value: 'timestamp', label: 'Timestamp' }
+                { value: 'customerName', label: 'Customer Name', required: true },
+                { value: 'date', label: 'Move-in Date & Time', required: true },
+                { value: 'contactNumber', label: 'Contact Number' },
+                { value: 'remarks', label: 'Remarks/Special Instructions' },
+                { value: 'status', label: 'Status' }
             ]
         };
         
@@ -674,18 +735,105 @@
             });
             
             // Initialize field options
-            fieldOptions = fieldOptionsData.key_handover;
+            fieldOptions = fieldOptionsData.keyHandover;
+            
+            // Setup connection monitoring
+            setupConnectionMonitoring();
+            
+            // Update pending import count
+            updatePendingImportCount();
         });
+        
+        // Setup connection monitoring - NEW FUNCTION
+        function setupConnectionMonitoring() {
+            window.addEventListener('online', handleOnlineStatus);
+            window.addEventListener('offline', handleOfflineStatus);
+            
+            updateConnectionStatus();
+        }
+        
+        // Handle online status - NEW FUNCTION
+        function handleOnlineStatus() {
+            isOnline = true;
+            updateConnectionStatus();
+            showNotification('Back online. Data will sync to cloud.', 'success');
+        }
+        
+        // Handle offline status - NEW FUNCTION
+        function handleOfflineStatus() {
+            isOnline = false;
+            updateConnectionStatus();
+            showNotification('You are offline. Data will be saved locally.', 'warning');
+        }
+        
+        // Update connection status - NEW FUNCTION
+        function updateConnectionStatus() {
+            const statusElement = document.getElementById('syncStatus');
+            if (statusElement) {
+                const indicator = statusElement.querySelector('.sync-indicator');
+                indicator.className = isOnline ? 'sync-indicator sync-online' : 'sync-indicator sync-offline';
+                statusElement.innerHTML = `<span class="${isOnline ? 'sync-indicator sync-online' : 'sync-indicator sync-offline'}"></span> ${isOnline ? 'Online' : 'Offline'}`;
+            }
+        }
+        
+        // Update pending import count - NEW FUNCTION
+        function updatePendingImportCount() {
+            const pendingImports = JSON.parse(localStorage.getItem('hot_pending_imports') || '[]');
+            const countElement = document.getElementById('pendingImportCount');
+            
+            if (pendingImports.length > 0) {
+                countElement.textContent = pendingImports.length;
+                countElement.style.display = 'inline';
+            } else {
+                countElement.style.display = 'none';
+            }
+        }
+        
+        // Sync pending imports - NEW FUNCTION
+        async function syncPendingImports() {
+            if (!isOnline) {
+                showNotification('You are offline. Cannot sync to cloud.', 'warning');
+                return;
+            }
+            
+            const pendingImports = JSON.parse(localStorage.getItem('hot_pending_imports') || '[]');
+            if (pendingImports.length === 0) {
+                showNotification('No pending imports to sync', 'info');
+                return;
+            }
+            
+            showNotification(`Syncing ${pendingImports.length} pending imports to cloud...`, 'info');
+            
+            let syncedCount = 0;
+            let failedCount = 0;
+            
+            for (const importData of pendingImports) {
+                const result = await saveToGoogleAppsScript(importData);
+                if (result.success) {
+                    syncedCount++;
+                } else {
+                    failedCount++;
+                }
+            }
+            
+            if (failedCount === 0) {
+                // Clear pending imports
+                localStorage.setItem('hot_pending_imports', JSON.stringify([]));
+                updatePendingImportCount();
+                showNotification(`${syncedCount} imports synced to cloud successfully!`, 'success');
+            } else {
+                // Keep failed imports
+                showNotification(`${syncedCount} synced, ${failedCount} failed. Will retry later.`, 'warning');
+            }
+        }
         
         // Update step indicators
         function updateStepIndicator(currentStep) {
-            // Reset all steps
             for (let i = 1; i <= 4; i++) {
                 const step = document.getElementById(`step${i}`);
                 step.classList.remove('active', 'completed');
             }
             
-            // Set current step as active and previous steps as completed
             for (let i = 1; i <= currentStep; i++) {
                 const step = document.getElementById(`step${i}`);
                 if (i === currentStep) {
@@ -699,9 +847,8 @@
         // Update field options based on selected data type
         function updateFieldOptions() {
             const dataType = document.getElementById('dataType').value;
-            fieldOptions = fieldOptionsData[dataType] || fieldOptionsData.key_handover;
+            fieldOptions = fieldOptionsData[dataType] || fieldOptionsData.keyHandover;
             
-            // Regenerate mapping if already setup
             if (excelData && excelData.length > 0) {
                 setupColumnMapping();
             }
@@ -712,13 +859,11 @@
             const file = event.target.files[0];
             if (!file) return;
             
-            // Check file size (max 10MB)
             if (file.size > 10 * 1024 * 1024) {
                 alert('File size exceeds 10MB limit. Please use a smaller file.');
                 return;
             }
             
-            // Check file extension
             const validExtensions = ['.xlsx', '.xls', '.csv'];
             const fileExt = '.' + file.name.split('.').pop().toLowerCase();
             if (!validExtensions.includes(fileExt)) {
@@ -733,10 +878,7 @@
                     const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, { type: 'array' });
                     
-                    // Store workbook globally
                     currentWorkbook = workbook;
-                    
-                    // Show sheet selection
                     showSheetSelection(workbook);
                 } catch (error) {
                     alert('Error reading file: ' + error.message);
@@ -757,7 +899,6 @@
             if (sheetNames.length === 1) {
                 loadSheetData(workbook, sheetNames[0]);
             } else {
-                // Populate modal with sheet options
                 const modalBody = document.getElementById('sheetModalBody');
                 let modalContent = '<p>Multiple sheets found. Select which sheet to import:</p>';
                 
@@ -776,7 +917,6 @@
                 
                 modalBody.innerHTML = modalContent;
                 
-                // Show modal
                 const modal = new bootstrap.Modal(document.getElementById('sheetModal'));
                 modal.show();
             }
@@ -796,13 +936,11 @@
                 const worksheet = workbook.Sheets[sheetName];
                 const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
                 
-                // Check if data is empty
                 if (!jsonData || jsonData.length === 0 || (jsonData.length === 1 && jsonData[0].length === 0)) {
                     alert('Selected sheet is empty. Please choose another sheet.');
                     return;
                 }
                 
-                // Check row limit
                 if (jsonData.length > 10000) {
                     alert('File exceeds 10,000 row limit. Please use a smaller file.');
                     return;
@@ -824,14 +962,11 @@
             const previewCard = document.getElementById('previewCard');
             const uploadCard = document.getElementById('uploadCard');
             
-            // Clear previous preview
             previewTable.innerHTML = '';
             validationErrors = [];
             
-            // Show first 15 rows
             const previewRows = Math.min(15, data.length);
             
-            // Create header row
             const headerRow = document.createElement('tr');
             for (let j = 0; j < data[0].length; j++) {
                 const th = document.createElement('th');
@@ -841,7 +976,6 @@
             }
             previewTable.appendChild(headerRow);
             
-            // Create data rows
             for (let i = 1; i < previewRows; i++) {
                 const row = document.createElement('tr');
                 
@@ -855,20 +989,15 @@
                 previewTable.appendChild(row);
             }
             
-            // Update counts
             document.getElementById('rowCount').textContent = `${data.length} rows`;
             document.getElementById('colCount').textContent = `${data[0] ? data[0].length : 0} columns`;
             document.getElementById('errorCount').textContent = '0 errors';
             
-            // Show preview card, hide upload card
             uploadCard.style.display = 'none';
             previewCard.style.display = 'block';
             previewCard.scrollIntoView({ behavior: 'smooth' });
             
-            // Update step indicator
             updateStepIndicator(2);
-            
-            // Auto-validate
             validateData();
         }
         
@@ -881,14 +1010,11 @@
             }
             
             try {
-                // Parse CSV with proper handling of quotes and commas
                 const rows = [];
                 const lines = pasteData.split('\n');
                 
                 lines.forEach(line => {
-                    // Simple CSV parsing (for demo)
                     const cells = line.split(',').map(cell => {
-                        // Remove surrounding quotes if present
                         cell = cell.trim();
                         if (cell.startsWith('"') && cell.endsWith('"')) {
                             cell = cell.substring(1, cell.length - 1);
@@ -898,7 +1024,6 @@
                     rows.push(cells);
                 });
                 
-                // Check row limit
                 if (rows.length > 10000) {
                     alert('Pasted data exceeds 10,000 row limit. Please paste smaller data.');
                     return;
@@ -912,7 +1037,7 @@
             }
         }
         
-        // Validate data
+        // Validate data - STRICT DATE FORMAT
         function validateData() {
             if (!excelData || excelData.length < 2) {
                 alert('No data to validate');
@@ -922,25 +1047,25 @@
             validationErrors = [];
             const headers = excelData[0];
             
-            // Check for required columns based on selected data type
             const dataType = document.getElementById('dataType').value;
             const requiredFields = fieldOptionsData[dataType].filter(f => f.required).map(f => f.value);
             
-            // Validate each row
             for (let i = 1; i < excelData.length; i++) {
                 const row = excelData[i];
                 const rowErrors = [];
                 
-                // Check for empty required fields
                 requiredFields.forEach(field => {
-                    const colIndex = headers.findIndex(h => h.toLowerCase().includes(field.toLowerCase()));
+                    const colIndex = headers.findIndex(h => 
+                        h && h.toString().toLowerCase().includes(field.toLowerCase())
+                    );
                     if (colIndex !== -1 && (!row[colIndex] || row[colIndex].toString().trim() === '')) {
                         rowErrors.push(`Missing ${field} in row ${i+1}`);
                     }
                 });
                 
-                // Validate tower values
-                const towerIndex = headers.findIndex(h => h.toLowerCase().includes('tower'));
+                const towerIndex = headers.findIndex(h => 
+                    h && h.toString().toLowerCase().includes('tower')
+                );
                 if (towerIndex !== -1 && row[towerIndex]) {
                     const tower = row[towerIndex].toString().toUpperCase();
                     if (!['A', 'B', 'C'].includes(tower)) {
@@ -948,8 +1073,9 @@
                     }
                 }
                 
-                // Validate flat numbers
-                const flatIndex = headers.findIndex(h => h.toLowerCase().includes('flat'));
+                const flatIndex = headers.findIndex(h => 
+                    h && h.toString().toLowerCase().includes('flat')
+                );
                 if (flatIndex !== -1 && row[flatIndex]) {
                     const flat = row[flatIndex].toString();
                     if (!/^\d+$/.test(flat)) {
@@ -957,12 +1083,11 @@
                     }
                 }
                 
-                // Validate date fields
                 headers.forEach((header, index) => {
-                    if (header.toLowerCase().includes('date') && row[index]) {
+                    if (header && header.toString().toLowerCase().includes('date') && row[index]) {
                         const dateStr = row[index].toString();
                         if (!isValidDate(dateStr)) {
-                            rowErrors.push(`Invalid date format '${dateStr}' in row ${i+1}, column '${header}'. Use DD.MM.YYYY (e.g., 01.01.2025).`);
+                            rowErrors.push(`Invalid date format '${dateStr}' in row ${i+1}, column '${header}'. Use DD.MM.YYYY (e.g., 01.01.2025) or DD.MM.YYYY HH:MM.`);
                         }
                     }
                 });
@@ -975,15 +1100,17 @@
                 }
             }
             
-            // Update UI with validation results
             updateValidationUI();
         }
         
-        // Check if date is valid - STRICTLY DD.MM.YYYY format (01.01.2025)
+        // Check if date is valid - STRICTLY DD.MM.YYYY or DD.MM.YYYY HH:MM
         function isValidDate(dateString) {
-            // Strictly use DD.MM.YYYY format (01.01.2025)
-            const format = /^\d{2}\.\d{2}\.\d{4}$/; // DD.MM.YYYY
-            return format.test(dateString);
+            // Check for DD.MM.YYYY
+            const format1 = /^\d{2}\.\d{2}\.\d{4}$/;
+            // Check for DD.MM.YYYY HH:MM
+            const format2 = /^\d{2}\.\d{2}\.\d{4} \d{1,2}:\d{2}$/;
+            
+            return format1.test(dateString) || format2.test(dateString);
         }
         
         // Update validation UI
@@ -1007,9 +1134,8 @@
                 validationAlert.innerHTML = `<i class="fas fa-exclamation-triangle"></i> Found ${errorCount} rows with errors. Please review before importing.`;
                 validationAlert.style.display = 'block';
                 
-                // Show error details
                 let errorHTML = '<h6>Error Details:</h6><ul class="mb-0">';
-                validationErrors.slice(0, 10).forEach(error => { // Show first 10 errors
+                validationErrors.slice(0, 10).forEach(error => {
                     error.errors.forEach(err => {
                         errorHTML += `<li>${err}</li>`;
                     });
@@ -1021,8 +1147,6 @@
                 
                 errorList.innerHTML = errorHTML;
                 errorList.style.display = 'block';
-                
-                // Highlight problematic rows in preview
                 highlightValidationErrors();
             }
         }
@@ -1032,12 +1156,10 @@
             const table = document.getElementById('previewTable');
             const rows = table.querySelectorAll('tr');
             
-            // Reset all rows
             rows.forEach(row => {
                 row.classList.remove('validation-error', 'validation-success');
             });
             
-            // Highlight rows with errors
             validationErrors.forEach(error => {
                 if (error.row <= rows.length) {
                     rows[error.row].classList.add('validation-error');
@@ -1049,7 +1171,6 @@
         function setupColumnMapping() {
             if (!excelData || excelData.length < 1) return;
             
-            // Check if there are validation errors
             if (validationErrors.length > 0) {
                 if (!confirm('There are validation errors. Do you want to continue anyway?')) {
                     return;
@@ -1061,14 +1182,13 @@
             const mappingCard = document.getElementById('mappingCard');
             const previewCard = document.getElementById('previewCard');
             
-            // Clear previous mapping
             columnMapping = {};
             
             let html = '<h6>Map Excel Columns:</h6>';
             
             headers.forEach((header, index) => {
                 const field = fieldOptions.find(f => 
-                    f.value && header.toLowerCase().includes(f.value.toLowerCase())
+                    f.value && header && header.toString().toLowerCase().includes(f.value.toLowerCase())
                 );
                 const defaultValue = field ? field.value : '';
                 
@@ -1094,22 +1214,19 @@
             
             mappingDiv.innerHTML = html;
             
-            // Initialize column mapping with detected values
             headers.forEach((header, index) => {
                 const field = fieldOptions.find(f => 
-                    f.value && header.toLowerCase().includes(f.value.toLowerCase())
+                    f.value && header && header.toString().toLowerCase().includes(f.value.toLowerCase())
                 );
                 if (field) {
                     columnMapping[index] = field.value;
                 }
             });
             
-            // Show mapping card, hide preview card
             previewCard.style.display = 'none';
             mappingCard.style.display = 'block';
             mappingCard.scrollIntoView({ behavior: 'smooth' });
             
-            // Update step indicator
             updateStepIndicator(3);
         }
         
@@ -1132,7 +1249,6 @@
                 return;
             }
             
-            // Check required mappings
             const dataType = document.getElementById('dataType').value;
             const requiredFields = fieldOptionsData[dataType].filter(f => f.required).map(f => f.value);
             const mappedColumns = Object.values(columnMapping);
@@ -1143,19 +1259,16 @@
                 return;
             }
             
-            // Show progress card
             document.getElementById('mappingCard').style.display = 'none';
             document.getElementById('progressCard').style.display = 'block';
             document.getElementById('progressCard').scrollIntoView({ behavior: 'smooth' });
             
-            // Update step indicator
             updateStepIndicator(4);
             
-            // Start import process
             startImportProcess();
         }
         
-        // Start import process
+        // Start import process - UPDATED with Google Apps Script
         async function startImportProcess() {
             if (!excelData || excelData.length < 2) return;
             
@@ -1164,7 +1277,8 @@
             
             const dataType = document.getElementById('dataType').value;
             const importStrategy = document.getElementById('importStrategy').value;
-            const skipHeader = true; // Always skip header row
+            const syncToCloud = document.getElementById('syncToCloud').checked;
+            const skipHeader = true;
             const startRow = skipHeader ? 1 : 0;
             const totalRows = excelData.length - startRow;
             
@@ -1176,10 +1290,8 @@
             const importLogDiv = document.getElementById('importLog');
             importLogDiv.innerHTML = '';
             
-            // Show cancel button
             document.getElementById('cancelBtn').style.display = 'inline-block';
             
-            // Process each row
             for (let i = startRow; i < excelData.length; i++) {
                 if (importCanceled) {
                     logImport('Import canceled by user', 'warning');
@@ -1189,26 +1301,21 @@
                 processedRows++;
                 const percent = Math.round((processedRows / totalRows) * 100);
                 
-                // Update progress
                 document.getElementById('importProgress').style.width = `${percent}%`;
                 document.getElementById('importPercent').textContent = `${percent}%`;
                 document.getElementById('importStatus').textContent = `Processing row ${processedRows} of ${totalRows}`;
                 
-                // Process row
                 const row = excelData[i];
-                const rowData = { data_type: dataType };
+                const rowData = { processStep: dataType };
                 
-                // Map columns
                 Object.keys(columnMapping).forEach(colIndex => {
                     if (columnMapping[colIndex] && row[colIndex]) {
                         rowData[columnMapping[colIndex]] = row[colIndex];
                     }
                 });
                 
-                // Import row
-                const result = await importRowData(rowData, i + 1, importStrategy);
+                const result = await importRowData(rowData, i + 1, importStrategy, syncToCloud);
                 
-                // Update counters
                 if (result.success) {
                     importedCount++;
                 } else if (result.skipped) {
@@ -1217,33 +1324,25 @@
                     errorCount++;
                 }
                 
-                // Update counters display
                 document.getElementById('importedCount').textContent = importedCount;
                 document.getElementById('skippedCount').textContent = skippedCount;
                 document.getElementById('errorImportCount').textContent = errorCount;
                 
-                // Log result
                 const logEntry = document.createElement('div');
                 logEntry.className = result.success ? 'log-success' : 
                                    result.skipped ? 'log-warning' : 'log-error';
                 logEntry.textContent = `Row ${i + 1}: ${result.message}`;
                 importLogDiv.appendChild(logEntry);
-                
-                // Scroll to bottom of log
                 importLogDiv.scrollTop = importLogDiv.scrollHeight;
                 
-                // Small delay to show progress (remove in production)
+                // Small delay to show progress
                 await new Promise(resolve => setTimeout(resolve, 10));
             }
             
-            // Import complete
             isImporting = false;
-            
-            // Hide cancel button, show complete button
             document.getElementById('cancelBtn').style.display = 'none';
             document.getElementById('completeBtn').style.display = 'inline-block';
             
-            // Final log
             const finalLog = document.createElement('div');
             finalLog.className = 'log-success';
             finalLog.innerHTML = `<strong>Import Complete:</strong> ${importedCount} imported, ${skippedCount} skipped, ${errorCount} failed`;
@@ -1251,13 +1350,15 @@
             
             document.getElementById('importStatus').textContent = 'Import Complete';
             document.getElementById('importProgress').className = 'progress-bar bg-success';
+            
+            // Update pending import count
+            updatePendingImportCount();
         }
         
-        // Import single row of data
-        async function importRowData(rowData, rowNumber, strategy) {
+        // Import single row of data - UPDATED with Google Apps Script
+        async function importRowData(rowData, rowNumber, strategy, syncToCloud) {
             try {
-                // Validate required fields
-                const dataType = rowData.data_type;
+                const dataType = rowData.processStep;
                 const requiredFields = fieldOptionsData[dataType].filter(f => f.required).map(f => f.value);
                 
                 for (const field of requiredFields) {
@@ -1270,7 +1371,6 @@
                     }
                 }
                 
-                // Validate tower
                 if (rowData.tower && !['A', 'B', 'C'].includes(rowData.tower.toUpperCase())) {
                     return {
                         success: false,
@@ -1279,7 +1379,6 @@
                     };
                 }
                 
-                // Validate flat number
                 if (rowData.flat && !/^\d+$/.test(rowData.flat.toString())) {
                     return {
                         success: false,
@@ -1288,159 +1387,50 @@
                     };
                 }
                 
-                // Load existing data
-                let hotData = JSON.parse(localStorage.getItem('hot_process_data') || '{"towers":{"A":{"flats":{}},"B":{"flats":{}},"C":{"flats":{}}}}');
+                // Prepare data for Google Apps Script
+                const dataForCloud = {
+                    id: `${rowData.tower}_${rowData.flat}_${dataType}_${Date.now()}`,
+                    tower: rowData.tower.toUpperCase(),
+                    flatNumber: rowData.flat.toString(),
+                    processStep: dataType,
+                    stepData: { ...rowData },
+                    createdBy: deviceId,
+                    updatedBy: deviceId,
+                    importDate: new Date().toISOString()
+                };
                 
-                const tower = rowData.tower.toUpperCase();
-                const flatId = `${tower}-${rowData.flat}`;
+                delete dataForCloud.stepData.processStep;
+                delete dataForCloud.stepData.tower;
+                delete dataForCloud.stepData.flat;
                 
-                // Check if flat already exists
-                const flatExists = hotData.towers[tower] && hotData.towers[tower].flats[flatId];
-                
-                // Apply import strategy
-                if (strategy === 'add_new' && flatExists) {
-                    return {
-                        success: false,
-                        skipped: true,
-                        message: `Skipped (flat already exists)`
-                    };
-                }
-                
-                if (strategy === 'update_existing' && !flatExists) {
-                    return {
-                        success: false,
-                        skipped: true,
-                        message: `Skipped (flat doesn't exist)`
-                    };
-                }
-                
-                if (strategy === 'replace_all') {
-                    // Clear existing data for this flat
-                    if (hotData.towers[tower]) {
-                        hotData.towers[tower].flats[flatId] = {};
+                if (syncToCloud && isOnline) {
+                    const result = await saveToGoogleAppsScript(dataForCloud);
+                    if (!result.success && !result.local) {
+                        return {
+                            success: false,
+                            skipped: false,
+                            message: `Cloud save failed: ${result.error}`
+                        };
                     }
                 }
                 
-                // Initialize flat data if not exists
-                if (!hotData.towers[tower]) {
-                    hotData.towers[tower] = { flats: {} };
+                if (!syncToCloud || !isOnline) {
+                    saveToLocalStorage(dataForCloud);
+                    
+                    if (syncToCloud && !isOnline) {
+                        queueForCloudSync(dataForCloud);
+                        return {
+                            success: true,
+                            skipped: false,
+                            message: `Saved locally (offline). Queued for cloud sync.`
+                        };
+                    }
                 }
-                if (!hotData.towers[tower].flats[flatId]) {
-                    hotData.towers[tower].flats[flatId] = {};
-                }
-                
-                // Import based on data type
-                switch(dataType) {
-                    case 'key_handover':
-                        hotData.towers[tower].flats[flatId].keyHandover = {
-                            date: rowData.handover_date || new Date().toISOString().split('T')[0],
-                            person: rowData.handover_person || '',
-                            incompleteKeys: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.incomplete_keys || '').toUpperCase()),
-                            remarks: rowData.key_remarks || null,
-                            status: rowData.status || 'completed',
-                            imported: true,
-                            importDate: new Date().toISOString()
-                        };
-                        break;
-                        
-                    case 'snagging':
-                        hotData.towers[tower].flats[flatId].snagging = {
-                            startDate: rowData.start_date || new Date().toISOString().split('T')[0],
-                            endDate: rowData.end_date || null,
-                            inspector: rowData.inspector || '',
-                            categories: {
-                                mep: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.mep_completed || '').toUpperCase()),
-                                civil: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.civil_completed || '').toUpperCase()),
-                                electrical: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.electrical_completed || '').toUpperCase()),
-                                water: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.water_completed || '').toUpperCase()),
-                                acDrain: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.ac_drain_completed || '').toUpperCase()),
-                                tiles: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.tiles_completed || '').toUpperCase())
-                            },
-                            remarks: rowData.snag_remarks || null,
-                            followUpDate: rowData.followup_date || null,
-                            status: rowData.status || 'completed',
-                            imported: true,
-                            importDate: new Date().toISOString()
-                        };
-                        break;
-                        
-                    case 'first_visit':
-                        hotData.towers[tower].flats[flatId].firstVisit = {
-                            ownerName: rowData.owner_name || '',
-                            ownerPhone: rowData.owner_phone || '',
-                            visitDate: rowData.visit_date || new Date().toISOString(),
-                            hotMember: rowData.hot_member || '',
-                            remarks: rowData.customer_remarks || null,
-                            handoverDateSuggested: rowData.handover_suggested || null,
-                            crmNOC: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.crm_noc || '').toUpperCase()),
-                            status: rowData.status || 'completed',
-                            imported: true,
-                            importDate: new Date().toISOString()
-                        };
-                        break;
-                        
-                    case 'handover':
-                        hotData.towers[tower].flats[flatId].handover = {
-                            customer: rowData.customer_name || '',
-                            secondOwner: rowData.second_owner || null,
-                            ownerEmail: rowData.owner_email || '',
-                            secondOwnerEmail: rowData.second_owner_email || null,
-                            hotMember: rowData.hoto_member || '',
-                            date: rowData.handover_date || new Date().toISOString(),
-                            documents: {
-                                keys: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.keys_handed || '').toUpperCase()),
-                                manual: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.manual_handed || '').toUpperCase()),
-                                amc: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.gift_box_handed || '').toUpperCase())
-                            },
-                            feedback: rowData.customer_feedback || null,
-                            status: rowData.status || 'completed',
-                            imported: true,
-                            importDate: new Date().toISOString()
-                        };
-                        break;
-                        
-                    case 'interiors':
-                        hotData.towers[tower].flats[flatId].interiors = {
-                            startDate: rowData.start_date || new Date().toISOString().split('T')[0],
-                            endDate: rowData.end_date || null,
-                            contractor: rowData.contractor_name || '',
-                            contractorContact: rowData.contractor_contact || null,
-                            workTypes: {
-                                flooring: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.flooring || '').toUpperCase()),
-                                painting: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.painting || '').toUpperCase()),
-                                carpentry: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.carpentry || '').toUpperCase()),
-                                electrical: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.electrical || '').toUpperCase()),
-                                plumbing: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.plumbing || '').toUpperCase()),
-                                falseCeiling: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.false_ceiling || '').toUpperCase())
-                            },
-                            clearanceBy: rowData.clearance_by || null,
-                            remarks: rowData.interior_remarks || null,
-                            status: rowData.status || 'started',
-                            imported: true,
-                            importDate: new Date().toISOString()
-                        };
-                        break;
-                        
-                    case 'movein':
-                        hotData.towers[tower].flats[flatId].movein = {
-                            customer: rowData.customer_name || '',
-                            date: rowData.movein_date || new Date().toISOString(),
-                            contact: rowData.contact_number || null,
-                            remarks: rowData.movein_remarks || null,
-                            status: rowData.status || 'completed',
-                            imported: true,
-                            importDate: new Date().toISOString()
-                        };
-                        break;
-                }
-                
-                // Save to localStorage
-                localStorage.setItem('hot_process_data', JSON.stringify(hotData));
                 
                 return {
                     success: true,
                     skipped: false,
-                    message: `Imported ${dataType} for Tower ${tower} - Flat ${rowData.flat}`
+                    message: `Imported ${dataType} for Tower ${rowData.tower} - Flat ${rowData.flat}`
                 };
                 
             } catch (error) {
@@ -1450,6 +1440,58 @@
                     message: `Error: ${error.message}`
                 };
             }
+        }
+        
+        // Save to Google Apps Script - NEW FUNCTION
+        async function saveToGoogleAppsScript(data) {
+            if (!isOnline) {
+                queueForCloudSync(data);
+                return { success: true, message: 'Queued for cloud sync (offline)', local: true };
+            }
+            
+            try {
+                const response = await fetch(GAS_WEB_APP_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                return result;
+                
+            } catch (error) {
+                console.error('Error saving to Google Apps Script:', error);
+                queueForCloudSync(data);
+                return { success: false, error: error.message, local: true };
+            }
+        }
+        
+        // Save to local storage - NEW FUNCTION
+        function saveToLocalStorage(data) {
+            let hotData = JSON.parse(localStorage.getItem('hot_process_data') || '{"towers":{"A":{"flats":{}},"B":{"flats":{}},"C":{"flats":{}}}}');
+            const tower = data.tower;
+            const flatId = `${tower}-${data.flatNumber}`;
+            
+            if (!hotData.towers[tower]) {
+                hotData.towers[tower] = { flats: {} };
+            }
+            
+            hotData.towers[tower].flats[flatId] = data;
+            localStorage.setItem('hot_process_data', JSON.stringify(hotData));
+        }
+        
+        // Queue for cloud sync - NEW FUNCTION
+        function queueForCloudSync(data) {
+            let pendingImports = JSON.parse(localStorage.getItem('hot_pending_imports') || '[]');
+            pendingImports.push({
+                data: data,
+                timestamp: new Date().toISOString(),
+                device: deviceId
+            });
+            localStorage.setItem('hot_pending_imports', JSON.stringify(pendingImports));
+            updatePendingImportCount();
         }
         
         // Log import message
@@ -1486,7 +1528,6 @@
             
             alert(message);
             
-            // Navigate back to dashboard
             setTimeout(() => {
                 window.location.href = 'index.html';
             }, 1000);
@@ -1500,110 +1541,84 @@
             switch(type) {
                 case 'key_handover':
                     templateData = [
-                        ['Tower', 'Flat', 'Handover_Person', 'Handover_Date', 'Incomplete_Keys', 'Remarks', 'Status'],
+                        ['Tower', 'Flat', 'Person', 'Date', 'IncompleteKeys', 'Remarks', 'Status'],
                         ['A', '1503', 'John Doe', '01.01.2025', 'NO', 'All keys received', 'completed'],
                         ['B', '2207', 'Jane Smith', '02.01.2025', 'YES', 'Missing main door key', 'completed'],
-                        ['C', '0905', 'Mike Johnson', '03.01.2025', 'NO', 'All keys handed over', 'completed'],
-                        ['', '', '', '', '', '', ''],
-                        ['Instructions:', '', '', '', '', '', ''],
-                        ['1. Fill in data starting from row 2', '', '', '', '', '', ''],
-                        ['2. Keep column headers exactly as shown', '', '', '', '', '', ''],
-                        ['3. Date format: DD.MM.YYYY (e.g., 01.01.2025)', '', '', '', '', '', ''],
-                        ['4. Status: completed/pending/delayed', '', '', '', '', '', '']
+                        ['C', '0905', 'Mike Johnson', '03.01.2025', 'NO', 'All keys handed over', 'completed']
                     ];
                     filename = 'key_handover_template.xlsx';
                     break;
                     
                 case 'snagging':
                     templateData = [
-                        ['Tower', 'Flat', 'Inspector', 'Start_Date', 'End_Date', 'Followup_Date', 'MEP_Completed', 'Civil_Completed', 'Electrical_Completed', 'Water_Completed', 'AC_Drain_Completed', 'Tiles_Completed', 'Remarks', 'Status'],
-                        ['A', '1503', 'Mike Johnson', '01.01.2025', '08.01.2025', '11.01.2025', 'YES', 'YES', 'NO', 'YES', 'YES', 'YES', 'Electrical pending', 'completed'],
-                        ['C', '0905', 'Sarah Wilson', '02.01.2025', '09.01.2025', '12.01.2025', 'YES', 'NO', 'YES', 'YES', 'YES', 'NO', 'Civil work needed', 'pending'],
-                        ['B', '2207', 'Alex Chen', '03.01.2025', '10.01.2025', '13.01.2025', 'YES', 'YES', 'YES', 'YES', 'NO', 'YES', 'AC drain issues', 'delayed'],
-                        ['', '', '', '', '', '', '', '', '', '', '', '', '', ''],
-                        ['Instructions:', '', '', '', '', '', '', '', '', '', '', '', '', ''],
-                        ['1. Fill in data starting from row 2', '', '', '', '', '', '', '', '', '', '', '', '', ''],
-                        ['2. YES/NO fields: Use YES or NO only', '', '', '', '', '', '', '', '', '', '', '', '', ''],
-                        ['3. Date format: DD.MM.YYYY (e.g., 01.01.2025)', '', '', '', '', '', '', '', '', '', '', '', '', ''],
-                        ['4. Status: completed/pending/delayed', '', '', '', '', '', '', '', '', '', '', '', '', '']
+                        ['Tower', 'Flat', 'Inspector', 'StartDate', 'EndDate', 'FollowupDate', 'MepCompleted', 'CivilCompleted', 'ElectricalCompleted', 'WaterCompleted', 'AcDrainCompleted', 'TilesCompleted', 'Remarks', 'Status'],
+                        ['A', '1503', 'Mike Johnson', '01.01.2025', '08.01.2025', '11.01.2025', 'YES', 'YES', 'NO', 'YES', 'YES', 'YES', 'Electrical pending', 'completed']
                     ];
                     filename = 'snagging_template.xlsx';
                     break;
                     
                 case 'first_visit':
                     templateData = [
-                        ['Tower', 'Flat', 'Owner_Name', 'Owner_Phone', 'Visit_Date', 'HOT_Member', 'Handover_Suggested', 'Customer_Remarks', 'CRM_NOC', 'Status'],
-                        ['B', '2207', 'Robert Brown', '9876543210', '01.01.2025 14:30', 'Alex Chen', '06.01.2025 10:00', 'Customer satisfied', 'YES', 'completed'],
-                        ['A', '1806', 'Emily Davis', '8765432109', '02.01.2025 11:00', 'Sam Wilson', '', 'Rescue flat - special handling', 'NO', 'completed'],
-                        ['C', '0905', 'David Wilson', '7654321098', '03.01.2025 15:00', 'Lisa Wang', '08.01.2025 09:30', 'Minor issues noted', 'YES', 'completed'],
-                        ['', '', '', '', '', '', '', '', '', ''],
-                        ['Instructions:', '', '', '', '', '', '', '', '', ''],
-                        ['1. Fill in data starting from row 2', '', '', '', '', '', '', '', '', ''],
-                        ['2. Phone: 10-digit mobile number', '', '', '', '', '', '', '', '', ''],
-                        ['3. Date format: DD.MM.YYYY HH:MM', '', '', '', '', '', '', '', '', ''],
-                        ['4. CRM NOC: YES or NO', '', '', '', '', '', '', '', '', '']
+                        ['Tower', 'Flat', 'OwnerName', 'OwnerPhone', 'Date', 'HotMember', 'HandoverSuggested', 'Remarks', 'CrmNOC', 'Status'],
+                        ['B', '2207', 'Robert Brown', '9876543210', '01.01.2025 14:30', 'Alex Chen', '06.01.2025 10:00', 'Customer satisfied', 'YES', 'completed']
                     ];
                     filename = 'first_visit_template.xlsx';
                     break;
                     
                 case 'handover':
                     templateData = [
-                        ['Tower', 'Flat', 'Customer_Name', 'Second_Owner', 'Owner_Email', 'Second_Owner_Email', 'HOTO_Member', 'Handover_Date', 'Keys_Handed', 'Manual_Handed', 'Gift_Box_Handed', 'Customer_Feedback', 'Status'],
-                        ['A', '1503', 'Robert Brown', '', 'robert@email.com', '', 'Alex Chen', '06.01.2025 10:00', 'YES', 'YES', 'YES', 'Very satisfied with the handover process', 'completed'],
-                        ['B', '2207', 'Emily Davis', 'John Davis', 'emily@email.com', 'john@email.com', 'Sam Wilson', '07.01.2025 11:00', 'YES', 'YES', 'NO', 'Gift box to be delivered next week', 'pending'],
-                        ['C', '0905', 'David Wilson', '', 'david@email.com', '', 'Lisa Wang', '08.01.2025 09:30', 'YES', 'YES', 'YES', 'All documents received', 'completed'],
-                        ['', '', '', '', '', '', '', '', '', '', '', '', ''],
-                        ['Instructions:', '', '', '', '', '', '', '', '', '', '', '', ''],
-                        ['1. Fill in data starting from row 2', '', '', '', '', '', '', '', '', '', '', '', ''],
-                        ['2. Email: Valid email addresses', '', '', '', '', '', '', '', '', '', '', '', ''],
-                        ['3. Date format: DD.MM.YYYY HH:MM', '', '', '', '', '', '', '', '', '', '', '', ''],
-                        ['4. YES/NO fields: Use YES or NO only', '', '', '', '', '', '', '', '', '', '', '', '']
+                        ['Tower', 'Flat', 'CustomerName', 'SecondOwner', 'OwnerEmail', 'SecondOwnerEmail', 'HotoMember', 'Date', 'KeysHanded', 'ManualHanded', 'GiftBoxHanded', 'Feedback', 'Status'],
+                        ['A', '1503', 'Robert Brown', '', 'robert@email.com', '', 'Alex Chen', '06.01.2025 10:00', 'YES', 'YES', 'YES', 'Very satisfied', 'completed']
                     ];
                     filename = 'handover_template.xlsx';
                     break;
                     
                 case 'interiors':
                     templateData = [
-                        ['Tower', 'Flat', 'Start_Date', 'End_Date', 'Contractor_Name', 'Contractor_Contact', 'Clearance_By', 'Flooring', 'Painting', 'Carpentry', 'Electrical', 'Plumbing', 'False_Ceiling', 'Remarks', 'Status'],
-                        ['A', '1503', '01.01.2025', '01.02.2025', 'Elite Interiors', '9876543210', 'Alex Chen', 'YES', 'YES', 'YES', 'NO', 'YES', 'NO', 'Electrical work will be done separately', 'started'],
-                        ['B', '2207', '02.01.2025', '15.02.2025', 'Premium Designs', '8765432109', 'Sam Wilson', 'YES', 'YES', 'YES', 'YES', 'YES', 'YES', 'Complete renovation', 'started'],
-                        ['C', '0905', '05.01.2025', '10.02.2025', 'Modern Interiors', '7654321098', 'Lisa Wang', 'NO', 'YES', 'NO', 'YES', 'NO', 'YES', 'Only painting and electrical work', 'started'],
-                        ['', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
-                        ['Instructions:', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
-                        ['1. Fill in data starting from row 2', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
-                        ['2. Contact: 10-digit phone number', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
-                        ['3. Date format: DD.MM.YYYY (e.g., 01.01.2025)', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
-                        ['4. YES/NO fields: Use YES or NO only', '', '', '', '', '', '', '', '', '', '', '', '', '', '']
+                        ['Tower', 'Flat', 'StartDate', 'EndDate', 'ContractorName', 'ContractorContact', 'ClearanceBy', 'Flooring', 'Painting', 'Carpentry', 'Electrical', 'Plumbing', 'FalseCeiling', 'Remarks', 'Status'],
+                        ['A', '1503', '01.01.2025', '01.02.2025', 'Elite Interiors', '9876543210', 'Alex Chen', 'YES', 'YES', 'YES', 'NO', 'YES', 'NO', 'Electrical work separately', 'started']
                     ];
                     filename = 'interior_work_template.xlsx';
                     break;
                     
                 case 'movein':
                     templateData = [
-                        ['Tower', 'Flat', 'Customer_Name', 'Movein_Date', 'Contact_Number', 'Remarks', 'Status'],
-                        ['A', '1503', 'Robert Brown', '01.01.2025 10:00', '9876543210', 'All furniture moved in', 'completed'],
-                        ['B', '2207', 'Emily Davis', '20.01.2025 14:00', '8765432109', 'Rescue flat - special arrangements made', 'completed'],
-                        ['C', '0905', 'David Wilson', '15.01.2025 09:00', '7654321098', 'Early morning move-in requested', 'completed'],
-                        ['', '', '', '', '', '', ''],
-                        ['Instructions:', '', '', '', '', '', ''],
-                        ['1. Fill in data starting from row 2', '', '', '', '', '', ''],
-                        ['2. Contact: 10-digit phone number', '', '', '', '', '', ''],
-                        ['3. Date format: DD.MM.YYYY HH:MM', '', '', '', '', '', ''],
-                        ['4. Status: completed/pending', '', '', '', '', '', '']
+                        ['Tower', 'Flat', 'CustomerName', 'Date', 'ContactNumber', 'Remarks', 'Status'],
+                        ['A', '1503', 'Robert Brown', '01.01.2025 10:00', '9876543210', 'All furniture moved in', 'completed']
                     ];
                     filename = 'movein_template.xlsx';
                     break;
             }
             
-            // Create worksheet
             const worksheet = XLSX.utils.aoa_to_sheet(templateData);
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, 'Template');
-            
-            // Generate file
             XLSX.writeFile(workbook, filename);
             
             logImport(`Template downloaded: ${filename}`, 'success');
+        }
+        
+        // Show notification - NEW FUNCTION
+        function showNotification(message, type) {
+            const notification = document.createElement('div');
+            notification.className = `alert alert-${type} alert-dismissible fade show`;
+            notification.style.position = 'fixed';
+            notification.style.top = '20px';
+            notification.style.right = '20px';
+            notification.style.zIndex = '9999';
+            notification.style.minWidth = '300px';
+            notification.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.remove();
+                }
+            }, 5000);
         }
     </script>
 </body>
