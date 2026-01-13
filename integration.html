@@ -6,11 +6,6 @@
     <title>Integration - HOT Process</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Firebase Dependencies -->
-    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-analytics.js"></script>
     <!-- SheetJS for Excel export -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
@@ -174,345 +169,40 @@
             50% { opacity: 0.5; }
             100% { opacity: 1; }
         }
-        
-        .debug-box {
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 5px;
-            padding: 10px;
-            margin-top: 10px;
-            font-family: monospace;
-            font-size: 0.85rem;
-            max-height: 200px;
-            overflow-y: auto;
-        }
-        
-        .debug-info {
-            color: #0d6efd;
-        }
-        
-        .debug-error {
-            color: #dc3545;
-        }
-        
-        .debug-success {
-            color: #198754;
-        }
-        
-        .debug-warning {
-            color: #ffc107;
-        }
-        
-        .config-table {
-            font-size: 0.9rem;
-        }
-        
-        .config-table td {
-            padding: 5px 10px;
-        }
-        
-        .config-table tr:nth-child(even) {
-            background-color: #f8f9fa;
-        }
-        
-        .init-status {
-            padding: 5px 10px;
-            border-radius: 5px;
-            font-size: 0.9rem;
-        }
-        
-        .init-success {
-            background-color: #d4edda;
-            color: #155724;
-        }
-        
-        .init-error {
-            background-color: #f8d7da;
-            color: #721c24;
-        }
-        
-        .init-warning {
-            background-color: #fff3cd;
-            color: #856404;
-        }
     </style>
 </head>
 <body>
-    <!-- Firebase Configuration and Initialization -->
+    <!-- GOOGLE APPS SCRIPT CONFIGURATION -->
     <script>
-        // Firebase Configuration
-        const firebaseConfig = {
-            apiKey: "AIzaSyBZoECRF1wzKzeqyJcaW2uAszbJylpeCkU",
-            authDomain: "hotoprocess.firebaseapp.com",
-            projectId: "hotoprocess",
-            storageBucket: "hotoprocess.firebasestorage.app",
-            messagingSenderId: "958524591846",
-            appId: "1:958524591846:web:b51c86974c212d01fe7527",
-            measurementId: "G-7KWHXLSP2J"
-        };
-        
-        // Global Firebase variables
-        let firebaseApp = null;
-        let db = null;
-        let auth = null;
-        let analytics = null;
-        let firebaseInitialized = false;
-        let initializationAttempts = 0;
-        const MAX_INIT_ATTEMPTS = 3;
-        
-        // Debug logging
-        function logDebug(message, type = "info") {
-            const debugBox = document.getElementById('debugBox');
-            if (debugBox) {
-                const timestamp = new Date().toLocaleTimeString();
-                let colorClass = "debug-info";
-                if (type === "error") colorClass = "debug-error";
-                else if (type === "success") colorClass = "debug-success";
-                else if (type === "warning") colorClass = "debug-warning";
-                
-                debugBox.innerHTML += `<div class="${colorClass}">[${timestamp}] ${message}</div>`;
-                debugBox.scrollTop = debugBox.scrollHeight;
-            }
-            console.log(`[FIREBASE ${type.toUpperCase()}] ${message}`);
-        }
-        
-        // Update Firebase status in UI
-        function updateFirebaseStatus(status, message) {
-            const statusElement = document.getElementById('firebaseInitStatus');
-            if (statusElement) {
-                statusElement.textContent = message;
-                statusElement.className = `init-${status}`;
-            }
-            
-            // Also update connection status
-            const connectionStatus = document.getElementById('firebaseConnectionStatus');
-            if (connectionStatus) {
-                if (status === 'success') {
-                    connectionStatus.className = 'test-status test-success';
-                    connectionStatus.textContent = 'Connected';
-                } else if (status === 'error') {
-                    connectionStatus.className = 'test-status test-failed';
-                    connectionStatus.textContent = 'Failed';
-                } else {
-                    connectionStatus.className = 'test-status test-pending';
-                    connectionStatus.textContent = 'Initializing...';
-                }
-            }
-        }
-        
-        // Initialize Firebase with retry logic
-        async function initializeFirebase() {
-            initializationAttempts++;
-            
-            try {
-                logDebug(`Initializing Firebase (attempt ${initializationAttempts}/${MAX_INIT_ATTEMPTS})...`, "info");
-                updateFirebaseStatus("warning", "Initializing...");
-                
-                // Check if Firebase scripts are loaded
-                if (typeof firebase === 'undefined') {
-                    throw new Error("Firebase SDK not loaded. Check internet connection.");
-                }
-                
-                logDebug(`Firebase SDK loaded: Version ${firebase.SDK_VERSION}`, "success");
-                
-                // Initialize Firebase app
-                if (firebase.apps.length === 0) {
-                    firebaseApp = firebase.initializeApp(firebaseConfig);
-                    logDebug("Firebase app initialized successfully", "success");
-                } else {
-                    firebaseApp = firebase.apps[0];
-                    logDebug("Using existing Firebase app", "info");
-                }
-                
-                // Initialize services
-                try {
-                    db = firebase.firestore();
-                    logDebug("Firestore service initialized", "success");
-                } catch (firestoreError) {
-                    logDebug(`Firestore initialization error: ${firestoreError.message}`, "error");
-                    throw new Error(`Firestore failed: ${firestoreError.message}`);
-                }
-                
-                try {
-                    auth = firebase.auth();
-                    logDebug("Authentication service initialized", "success");
-                } catch (authError) {
-                    logDebug(`Auth initialization error: ${authError.message}`, "warning");
-                }
-                
-                try {
-                    analytics = firebase.analytics();
-                    logDebug("Analytics service initialized", "success");
-                } catch (analyticsError) {
-                    logDebug(`Analytics initialization error: ${analyticsError.message}`, "warning");
-                }
-                
-                // Configure Firestore settings
-                const firestoreSettings = {
-                    cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED
-                };
-                
-                try {
-                    db.settings(firestoreSettings);
-                    logDebug("Firestore settings configured", "success");
-                } catch (settingsError) {
-                    logDebug(`Firestore settings error: ${settingsError.message}`, "warning");
-                }
-                
-                // Enable offline persistence
-                try {
-                    await db.enablePersistence();
-                    logDebug("Firestore offline persistence enabled", "success");
-                } catch (persistenceError) {
-                    logDebug(`Offline persistence not available: ${persistenceError.message}`, "warning");
-                }
-                
-                // Set up authentication
-                try {
-                    const authResult = await auth.signInAnonymously();
-                    logDebug(`Anonymous authentication successful: User ID ${authResult.user.uid}`, "success");
-                    
-                    firebaseInitialized = true;
-                    updateFirebaseStatus("success", "Connected & Authenticated");
-                    showNotification("Firebase connected successfully!", "success");
-                    
-                    // Load initial data
-                    setTimeout(() => {
-                        loadFirebaseStats();
-                        testFirebaseConnection(true);
-                    }, 1000);
-                    
-                } catch (authError) {
-                    logDebug(`Anonymous auth failed: ${authError.message} (Code: ${authError.code})`, "error");
-                    
-                    // Check if it's a permission error
-                    if (authError.code === 'auth/operation-not-allowed') {
-                        logDebug("Anonymous auth is disabled in Firebase Console", "error");
-                        logDebug("Enable it in: Authentication → Sign-in method → Anonymous → Enable", "error");
-                    }
-                    
-                    updateFirebaseStatus("error", `Auth failed: ${authError.code}`);
-                    showNotification(`Firebase auth error: ${authError.message}`, "error");
-                }
-                
-            } catch (error) {
-                logDebug(`Firebase initialization failed: ${error.message}`, "error");
-                updateFirebaseStatus("error", `Failed: ${error.message}`);
-                
-                // Retry if we haven't exceeded max attempts
-                if (initializationAttempts < MAX_INIT_ATTEMPTS) {
-                    logDebug(`Retrying in 3 seconds... (${MAX_INIT_ATTEMPTS - initializationAttempts} attempts remaining)`, "warning");
-                    setTimeout(initializeFirebase, 3000);
-                } else {
-                    showNotification("Firebase failed to initialize after multiple attempts", "error");
-                    logDebug("Max initialization attempts reached. Giving up.", "error");
-                    
-                    // Show setup instructions
-                    showFirebaseSetupInstructions();
-                }
-            }
-        }
-        
-        // Show Firebase setup instructions
-        function showFirebaseSetupInstructions() {
-            const instructions = `
-                <strong>Firebase Setup Instructions:</strong>
-                <ol>
-                    <li>Go to <a href="https://console.firebase.google.com/" target="_blank">Firebase Console</a></li>
-                    <li>Select or create project "hotoprocess"</li>
-                    <li>Enable Firestore Database:
-                        <ul>
-                            <li>Go to Firestore Database</li>
-                            <li>Click "Create Database"</li>
-                            <li>Start in test mode (for development)</li>
-                            <li>Choose location (us-central1 recommended)</li>
-                        </ul>
-                    </li>
-                    <li>Enable Anonymous Authentication:
-                        <ul>
-                            <li>Go to Authentication</li>
-                            <li>Click "Sign-in method" tab</li>
-                            <li>Enable "Anonymous" provider</li>
-                        </ul>
-                    </li>
-                    <li>Check your Firebase Config matches:
-                        <ul>
-                            <li>Project ID: hotoprocess</li>
-                            <li>App ID: 1:958524591846:web:b51c86974c212d01fe7527</li>
-                        </ul>
-                    </li>
-                </ol>
-            `;
-            
-            // Create modal or show in debug box
-            logDebug("SETUP REQUIRED: " + instructions.replace(/<[^>]*>/g, ''), "error");
-            
-            // Show alert with instructions
-            setTimeout(() => {
-                if (confirm("Firebase setup required. Click OK to see setup instructions in console.")) {
-                    console.log("%c=== FIREBASE SETUP INSTRUCTIONS ===", "color: blue; font-size: 16px; font-weight: bold;");
-                    console.log("1. Go to: https://console.firebase.google.com/");
-                    console.log("2. Select project: hotoprocess");
-                    console.log("3. Enable Firestore Database:");
-                    console.log("   - Click 'Firestore Database' in left menu");
-                    console.log("   - Click 'Create Database'");
-                    console.log("   - Start in 'test mode' for development");
-                    console.log("   - Choose location (us-central1 recommended)");
-                    console.log("4. Enable Anonymous Authentication:");
-                    console.log("   - Click 'Authentication' in left menu");
-                    console.log("   - Go to 'Sign-in method' tab");
-                    console.log("   - Enable 'Anonymous' provider");
-                    console.log("5. Verify your app configuration matches:");
-                    console.log("   - Project ID: hotoprocess");
-                    console.log("   - App ID: 1:958524591846:web:b51c86974c212d01fe7527");
-                }
-            }, 1000);
-        }
+        const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwRWU5znq3r653lh1qtPa6YDVtkxy77WO0nQ8uyrDF4qL-Dxay4Jim01aLMGtLzXj-M6g/exec';
+        let deviceId = localStorage.getItem('hot_device_id') || 'device_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem('hot_device_id', deviceId);
+        let isOnline = navigator.onLine;
+        let syncInterval = null;
         
         // Monitor online/offline status
         window.addEventListener('online', () => {
+            isOnline = true;
             updateConnectionStatus(true);
             showNotification("You're back online!", "success");
-            logDebug("Browser online", "success");
-            
-            // Try to reinitialize Firebase if not connected
-            if (!firebaseInitialized) {
-                setTimeout(initializeFirebase, 1000);
-            }
         });
         
         window.addEventListener('offline', () => {
+            isOnline = false;
             updateConnectionStatus(false);
             showNotification("You're offline. Some features may be limited.", "warning");
-            logDebug("Browser offline", "warning");
         });
         
         function updateConnectionStatus(isOnline) {
             const overallStatus = document.getElementById('overallStatus');
-            if (overallStatus) {
-                if (isOnline) {
-                    overallStatus.className = 'integration-status status-connected';
-                    overallStatus.innerHTML = '<span class="connection-indicator connection-online"></span> Online';
-                } else {
-                    overallStatus.className = 'integration-status status-disconnected';
-                    overallStatus.innerHTML = '<span class="connection-indicator connection-offline"></span> Offline';
-                }
+            if (isOnline) {
+                overallStatus.className = 'integration-status status-connected';
+                overallStatus.innerHTML = '<span class="connection-indicator connection-online"></span> Online';
+            } else {
+                overallStatus.className = 'integration-status status-disconnected';
+                overallStatus.innerHTML = '<span class="connection-indicator connection-offline"></span> Offline';
             }
         }
-        
-        // Initialize when page loads
-        document.addEventListener('DOMContentLoaded', function() {
-            logDebug("Page loaded, starting Firebase initialization...", "info");
-            
-            // Start Firebase initialization after a short delay
-            setTimeout(initializeFirebase, 500);
-            
-            // Load other configurations
-            loadConfiguration();
-            loadSyncLogs();
-            updateSyncStats();
-            loadBackupList();
-        });
     </script>
     
     <div class="container-fluid">
@@ -533,7 +223,7 @@
                         </li>
                         <li class="nav-item">
                             <a class="nav-link active" href="#google">
-                                <i class="fab fa-google me-2"></i> Google Sheets
+                                <i class="fas fa-code me-2"></i> Google Apps Script
                             </a>
                         </li>
                         <li class="nav-item">
@@ -542,8 +232,8 @@
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="#api">
-                                <i class="fas fa-code me-2"></i> API Configuration
+                            <a class="nav-link" href="#backup">
+                                <i class="fas fa-database me-2"></i> Backup
                             </a>
                         </li>
                         <li class="nav-item">
@@ -578,28 +268,13 @@
                     <div class="px-3">
                         <h6 class="text-muted mb-2">Sync Status</h6>
                         <div class="connection-test">
-                            <span class="test-status test-pending" id="googleTestStatus">Not Tested</span>
-                            <small>Google Sheets</small>
+                            <span class="test-status test-pending" id="gasTestStatus">Not Tested</span>
+                            <small>Google Apps Script</small>
                         </div>
                         <div class="connection-test">
-                            <span class="test-status test-pending" id="firebaseTestStatus">Not Tested</span>
-                            <small>Firebase</small>
+                            <span class="test-status test-pending" id="localTestStatus">Ready</span>
+                            <small>Local Storage</small>
                         </div>
-                    </div>
-                    
-                    <hr class="my-3">
-                    
-                    <div class="px-3">
-                        <h6 class="text-muted mb-2">Firebase Debug</h6>
-                        <button class="btn btn-sm btn-outline-info w-100 mb-2" onclick="reinitializeFirebase()">
-                            <i class="fas fa-redo"></i> Reinitialize Firebase
-                        </button>
-                        <button class="btn btn-sm btn-outline-secondary w-100" onclick="clearDebugLogs()">
-                            <i class="fas fa-broom"></i> Clear Debug Logs
-                        </button>
-                        <button class="btn btn-sm btn-outline-danger w-100 mt-2" onclick="showFirebaseSetupInstructions()">
-                            <i class="fas fa-question-circle"></i> Show Setup Help
-                        </button>
                     </div>
                 </div>
             </div>
@@ -616,96 +291,48 @@
                     </div>
                 </div>
                 
-                <!-- Debug Panel -->
-                <div class="card integration-card mb-3">
+                <!-- Google Apps Script Integration -->
+                <div class="card integration-card" id="google">
                     <div class="card-header d-flex align-items-center">
-                        <div class="integration-icon" style="background: #6c757d;">
-                            <i class="fas fa-bug"></i>
+                        <div class="integration-icon" style="background: #0F9D58;">
+                            <i class="fab fa-google"></i>
                         </div>
                         <div>
-                            <h5 class="mb-1">Firebase Debug Console</h5>
-                            <p class="text-muted mb-0">Debug Firebase connection issues</p>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <div class="alert alert-warning" id="firebaseAlert">
-                            <i class="fas fa-exclamation-triangle me-2"></i>
-                            <strong>Firebase Status:</strong> <span id="firebaseAlertText">Initializing...</span>
-                        </div>
-                        
-                        <div class="debug-box" id="debugBox">
-                            <!-- Debug logs will appear here -->
-                        </div>
-                        
-                        <div class="mt-3">
-                            <button class="btn btn-primary" onclick="checkFirebaseSetup()">
-                                <i class="fas fa-check-circle"></i> Check Firebase Setup
-                            </button>
-                            <button class="btn btn-warning ms-2" onclick="testFirebaseAuth()">
-                                <i class="fas fa-user-shield"></i> Test Authentication
-                            </button>
-                            <button class="btn btn-info ms-2" onclick="testFirestoreAccess()">
-                                <i class="fas fa-database"></i> Test Firestore Access
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Firebase Integration -->
-                <div class="card integration-card" id="firebase">
-                    <div class="card-header d-flex align-items-center">
-                        <div class="integration-icon" style="background: #FFA000;">
-                            <i class="fas fa-database"></i>
-                        </div>
-                        <div>
-                            <h5 class="mb-1">Firebase Database</h5>
-                            <p class="text-muted mb-0">Real-time cross-device data sync</p>
+                            <h5 class="mb-1">Google Apps Script Integration (Active)</h5>
+                            <p class="text-muted mb-0">Real-time cross-device data sync via Google Sheets</p>
                         </div>
                     </div>
                     <div class="card-body">
                         <div class="row">
                             <div class="col-md-8">
+                                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                                    <i class="fas fa-check-circle me-2"></i>
+                                    <strong>Success!</strong> Google Apps Script is configured and ready for real-time sync.
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                </div>
+                                
                                 <div class="mb-3">
-                                    <label class="form-label">Firebase Configuration</label>
-                                    <div class="table-responsive">
-                                        <table class="table table-sm table-bordered config-table">
-                                            <tbody>
-                                                <tr>
-                                                    <td><strong>Project ID</strong></td>
-                                                    <td>hotoprocess</td>
-                                                </tr>
-                                                <tr>
-                                                    <td><strong>Status</strong></td>
-                                                    <td><span class="init-status" id="firebaseInitStatus">Not Initialized</span></td>
-                                                </tr>
-                                                <tr>
-                                                    <td><strong>SDK Version</strong></td>
-                                                    <td id="firebaseSdkVersion">Loading...</td>
-                                                </tr>
-                                                <tr>
-                                                    <td><strong>Firestore Status</strong></td>
-                                                    <td id="firestoreStatus">Not connected</td>
-                                                </tr>
-                                                <tr>
-                                                    <td><strong>Auth Status</strong></td>
-                                                    <td id="authStatus">Not authenticated</td>
-                                                </tr>
-                                            </tbody>
-                                        </table>
+                                    <label class="form-label">Web App URL</label>
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" value="https://script.google.com/macros/s/AKfycbwRWU5znq3r653lh1qtPa6YDVtkxy77WO0nQ8uyrDF4qL-Dxay4Jim01aLMGtLzXj-M6g/exec" readonly>
+                                        <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard(this)">
+                                            <i class="fas fa-copy"></i> Copy
+                                        </button>
                                     </div>
+                                    <small class="text-muted">This URL connects to your Google Apps Script backend</small>
                                 </div>
                                 
                                 <div class="row">
                                     <div class="col-md-6">
                                         <div class="mb-3">
-                                            <label class="form-label">Total Records</label>
-                                            <input type="text" class="form-control" id="firebaseRecordCount" value="Not connected" readonly>
+                                            <label class="form-label">Total Records in Cloud</label>
+                                            <input type="text" class="form-control" id="gasRecordCount" value="Loading..." readonly>
                                         </div>
                                     </div>
                                     <div class="col-md-6">
                                         <div class="mb-3">
                                             <label class="form-label">Last Sync</label>
-                                            <input type="text" class="form-control" id="firebaseLastSync" value="Not connected" readonly>
+                                            <input type="text" class="form-control" id="gasLastSync" value="Loading..." readonly>
                                         </div>
                                     </div>
                                 </div>
@@ -713,16 +340,16 @@
                                 <div class="row">
                                     <div class="col-md-6">
                                         <div class="form-check mb-3">
-                                            <input class="form-check-input" type="checkbox" id="firebaseAutoSync" checked disabled>
-                                            <label class="form-check-label" for="firebaseAutoSync">
+                                            <input class="form-check-input" type="checkbox" id="gasAutoSync" checked>
+                                            <label class="form-check-label" for="gasAutoSync">
                                                 Real-time auto-sync enabled
                                             </label>
                                         </div>
                                     </div>
                                     <div class="col-md-6">
                                         <div class="form-check mb-3">
-                                            <input class="form-check-input" type="checkbox" id="firebaseOffline" checked>
-                                            <label class="form-check-label" for="firebaseOffline">
+                                            <input class="form-check-input" type="checkbox" id="gasOffline" checked>
+                                            <label class="form-check-label" for="gasOffline">
                                                 Offline data support
                                             </label>
                                         </div>
@@ -735,7 +362,7 @@
                                         <div class="col-md-4">
                                             <div class="card bg-light">
                                                 <div class="card-body text-center p-2">
-                                                    <h6 id="firebaseKeyCount">0</h6>
+                                                    <h6 id="gasKeyCount">0</h6>
                                                     <small class="text-muted">Key Handovers</small>
                                                 </div>
                                             </div>
@@ -743,7 +370,7 @@
                                         <div class="col-md-4">
                                             <div class="card bg-light">
                                                 <div class="card-body text-center p-2">
-                                                    <h6 id="firebaseSnagCount">0</h6>
+                                                    <h6 id="gasSnagCount">0</h6>
                                                     <small class="text-muted">Snagging</small>
                                                 </div>
                                             </div>
@@ -751,7 +378,7 @@
                                         <div class="col-md-4">
                                             <div class="card bg-light">
                                                 <div class="card-body text-center p-2">
-                                                    <h6 id="firebaseHandoverCount">0</h6>
+                                                    <h6 id="gasHandoverCount">0</h6>
                                                     <small class="text-muted">Handovers</small>
                                                 </div>
                                             </div>
@@ -763,146 +390,46 @@
                                 <div class="api-test-box">
                                     <h6>Connection Status</h6>
                                     <div class="connection-test mb-2">
-                                        <span class="test-status test-pending" id="firebaseConnectionStatus">Not Tested</span>
-                                        <small>Firebase Status</small>
+                                        <span class="test-status test-pending" id="gasConnectionStatus">Not Tested</span>
+                                        <small>Google Apps Script Status</small>
                                     </div>
                                     
                                     <div class="progress-thin">
-                                        <div class="progress-bar bg-secondary" id="firebaseSyncProgress" style="width: 0%"></div>
+                                        <div class="progress-bar bg-secondary" id="gasSyncProgress" style="width: 0%"></div>
                                     </div>
                                     
-                                    <button class="btn btn-sm btn-outline-primary w-100 mb-2" onclick="testFirebaseConnection()" id="testFirebaseBtn">
+                                    <button class="btn btn-sm btn-outline-primary w-100 mb-2" onclick="testGASConnection()" id="testGASBtn">
                                         <i class="fas fa-plug"></i> Test Connection
                                     </button>
-                                    <button class="btn btn-sm btn-outline-success w-100 mb-2" onclick="syncFirebaseToLocal()" id="downloadFirebaseBtn">
-                                        <i class="fas fa-download"></i> Download to Local
+                                    <button class="btn btn-sm btn-outline-success w-100 mb-2" onclick="syncFromGAS()" id="downloadGASBtn">
+                                        <i class="fas fa-download"></i> Download from Cloud
                                     </button>
-                                    <button class="btn btn-sm btn-outline-info w-100" onclick="syncLocalToFirebase()" id="uploadFirebaseBtn">
-                                        <i class="fas fa-upload"></i> Upload Local Data
+                                    <button class="btn btn-sm btn-outline-info w-100" onclick="syncToGAS()" id="uploadGASBtn">
+                                        <i class="fas fa-upload"></i> Upload to Cloud
                                     </button>
                                 </div>
                                 
                                 <div class="mt-3">
                                     <small class="text-muted d-block">Connection Type:</small>
-                                    <span>Real-time WebSocket</span>
+                                    <span>HTTPS REST API</span>
                                 </div>
                                 
                                 <div class="mt-2">
-                                    <small class="text-muted d-block">Authentication:</small>
-                                    <span id="authMethod">Anonymous</span>
-                                </div>
-                                
-                                <div class="mt-2">
-                                    <small class="text-muted d-block">User ID:</small>
-                                    <span id="firebaseUserId">Not logged in</span>
+                                    <small class="text-muted d-block">Data Security:</small>
+                                    <span>Public Read/Write (via Apps Script)</span>
                                 </div>
                             </div>
                         </div>
                         
                         <div class="d-flex justify-content-between mt-3">
-                            <button class="btn btn-success" onclick="refreshFirebaseStats()" id="refreshFirebaseBtn">
+                            <button class="btn btn-success" onclick="refreshGASStats()" id="refreshGASBtn">
                                 <i class="fas fa-redo"></i> Refresh Stats
                             </button>
-                            <button class="btn btn-outline-primary" onclick="exportFirebaseData()" id="exportFirebaseBtn">
+                            <button class="btn btn-outline-primary" onclick="exportGASData()" id="exportGASBtn">
                                 <i class="fas fa-download"></i> Export Data
                             </button>
-                            <button class="btn btn-outline-danger" onclick="clearFirebaseData()">
-                                <i class="fas fa-trash"></i> Clear All Data
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Google Sheets Integration -->
-                <div class="card integration-card" id="google">
-                    <div class="card-header d-flex align-items-center">
-                        <div class="integration-icon" style="background: #34A853;">
-                            <i class="fab fa-google"></i>
-                        </div>
-                        <div>
-                            <h5 class="mb-1">Google Sheets Integration (Backup)</h5>
-                            <p class="text-muted mb-0">Backup data to Google Sheets</p>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-8">
-                                <div class="mb-3">
-                                    <label class="form-label">Google Sheets URL</label>
-                                    <div class="input-group">
-                                        <input type="url" class="form-control" id="googleSheetUrl" 
-                                               placeholder="https://docs.google.com/spreadsheets/d/..." 
-                                               value="">
-                                        <button class="btn btn-outline-secondary" type="button" onclick="validateGoogleSheetURL()">
-                                            <i class="fas fa-check"></i> Validate
-                                        </button>
-                                    </div>
-                                    <small class="text-muted">Optional: For backup purposes only</small>
-                                </div>
-                                
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <div class="mb-3">
-                                            <label class="form-label">Backup Frequency</label>
-                                            <select class="form-select" id="googleSyncFreq">
-                                                <option value="daily">Daily</option>
-                                                <option value="weekly" selected>Weekly</option>
-                                                <option value="monthly">Monthly</option>
-                                                <option value="manual">Manual Only</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <div class="mb-3">
-                                            <label class="form-label">Backup Mode</label>
-                                            <select class="form-select" id="googleBackupMode">
-                                                <option value="append">Append</option>
-                                                <option value="replace" selected>Replace</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="form-check mb-3">
-                                    <input class="form-check-input" type="checkbox" id="googleAutoBackup">
-                                    <label class="form-check-label" for="googleAutoBackup">
-                                        Enable automatic backups
-                                    </label>
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="api-test-box">
-                                    <h6>Connection Test</h6>
-                                    <div class="connection-test mb-2">
-                                        <span class="test-status test-pending" id="googleConnectionStatus">Not Tested</span>
-                                        <small>Connection Status</small>
-                                    </div>
-                                    
-                                    <div class="progress-thin">
-                                        <div class="progress-bar bg-secondary" id="googleSyncProgress" style="width: 0%"></div>
-                                    </div>
-                                    
-                                    <button class="btn btn-sm btn-outline-primary w-100 mb-2" onclick="testGoogleConnection()" id="testGoogleBtn">
-                                        <i class="fas fa-plug"></i> Test Connection
-                                    </button>
-                                    <button class="btn btn-sm btn-outline-success w-100 mb-2" onclick="backupToGoogleSheets()" id="backupGoogleBtn">
-                                        <i class="fas fa-save"></i> Backup Now
-                                    </button>
-                                </div>
-                                
-                                <div class="mt-3">
-                                    <small class="text-muted d-block">Last Backup:</small>
-                                    <span id="googleLastSync">Never</span>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="d-flex justify-content-between mt-3">
-                            <button class="btn btn-success" onclick="saveGoogleConfig()" id="saveGoogleBtn">
-                                <i class="fas fa-save"></i> Save Configuration
-                            </button>
-                            <button class="btn btn-outline-primary" onclick="setupGoogleSheets()">
-                                <i class="fas fa-magic"></i> Setup Google Sheets
+                            <button class="btn btn-outline-warning" onclick="openGoogleSheet()">
+                                <i class="fas fa-external-link-alt"></i> Open Google Sheet
                             </button>
                         </div>
                     </div>
@@ -920,9 +447,9 @@
                         </div>
                     </div>
                     <div class="card-body">
-                        <div class="alert alert-warning alert-dismissible fade show" role="alert">
-                            <i class="fas fa-exclamation-triangle me-2"></i>
-                            <strong>Note:</strong> Excel import functionality requires the Excel Processor page. Use the Import Data button below.
+                        <div class="alert alert-info alert-dismissible fade show" role="alert">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Note:</strong> All data is automatically backed up to Google Sheets via Google Apps Script
                             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                         </div>
                         
@@ -1018,10 +545,89 @@
                     </div>
                 </div>
                 
+                <!-- Backup & Restore -->
+                <div class="card integration-card" id="backup">
+                    <div class="card-header d-flex align-items-center">
+                        <div class="integration-icon" style="background: var(--cbre-purple);">
+                            <i class="fas fa-database"></i>
+                        </div>
+                        <div>
+                            <h5 class="mb-1">Backup & Restore</h5>
+                            <p class="text-muted mb-0">Manage data backups and restoration</p>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Backup Configuration</h6>
+                                <div class="mb-3">
+                                    <label class="form-label">Auto Backup Frequency</label>
+                                    <select class="form-select" id="backupFrequency">
+                                        <option value="daily">Daily</option>
+                                        <option value="weekly" selected>Weekly</option>
+                                        <option value="monthly">Monthly</option>
+                                        <option value="manual">Manual Only</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Backup Location</label>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="backupLocation" id="backupLocal" checked>
+                                        <label class="form-check-label" for="backupLocal">
+                                            Local Browser Storage
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="backupLocation" id="backupCloud">
+                                        <label class="form-check-label" for="backupCloud">
+                                            Google Sheets (via Apps Script)
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <button class="btn btn-success" onclick="createBackup()" id="createBackupBtn">
+                                    <i class="fas fa-save"></i> Create Backup Now
+                                </button>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <h6>Restore Options</h6>
+                                <div class="mb-3">
+                                    <label class="form-label">Select Backup to Restore</label>
+                                    <select class="form-select" id="backupList">
+                                        <option value="">No backups available</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Restore Source</label>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="restoreSource" id="restoreLocal" checked>
+                                        <label class="form-check-label" for="restoreLocal">
+                                            From Local Backup
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="restoreSource" id="restoreCloud">
+                                        <label class="form-check-label" for="restoreCloud">
+                                            From Google Sheets
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <button class="btn btn-warning" onclick="restoreBackup()" id="restoreBackupBtn">
+                                    <i class="fas fa-undo"></i> Restore Selected Backup
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
                 <!-- Sync History -->
                 <div class="card integration-card" id="logs">
                     <div class="card-header d-flex align-items-center">
-                        <div class="integration-icon" style="background: var(--cbre-purple);">
+                        <div class="integration-icon" style="background: var(--cbre-orange);">
                             <i class="fas fa-history"></i>
                         </div>
                         <div>
@@ -1099,43 +705,60 @@
                     </div>
                 </div>
                 
-                <!-- Backup & Restore -->
+                <!-- Google Apps Script Configuration -->
                 <div class="card mt-4">
                     <div class="card-header">
-                        <h5 class="mb-0"><i class="fas fa-database me-2"></i>Backup & Restore</h5>
+                        <h5 class="mb-0"><i class="fas fa-cog me-2"></i>Advanced Settings</h5>
                     </div>
                     <div class="card-body">
                         <div class="row">
                             <div class="col-md-6">
-                                <h6>Backup Configuration</h6>
+                                <h6>Google Apps Script Settings</h6>
                                 <div class="mb-3">
-                                    <label class="form-label">Auto Backup Frequency</label>
-                                    <select class="form-select" id="backupFrequency">
-                                        <option value="daily">Daily</option>
-                                        <option value="weekly" selected>Weekly</option>
-                                        <option value="monthly">Monthly</option>
-                                        <option value="manual">Manual Only</option>
-                                    </select>
+                                    <label class="form-label">Web App URL</label>
+                                    <input type="text" class="form-control" id="gasUrl" value="https://script.google.com/macros/s/AKfycbwRWU5znq3r653lh1qtPa6YDVtkxy77WO0nQ8uyrDF4qL-Dxay4Jim01aLMGtLzXj-M6g/exec">
+                                    <small class="text-muted">Update if you deploy a new version of your Apps Script</small>
                                 </div>
                                 
-                                <button class="btn btn-success" onclick="createBackup()" id="createBackupBtn">
-                                    <i class="fas fa-save"></i> Create Backup Now
-                                </button>
+                                <div class="mb-3">
+                                    <label class="form-label">Sync Interval (seconds)</label>
+                                    <input type="number" class="form-control" id="syncInterval" value="30" min="10" max="300">
+                                    <small class="text-muted">How often to check for updates (10-300 seconds)</small>
+                                </div>
                             </div>
                             
                             <div class="col-md-6">
-                                <h6>Restore Options</h6>
+                                <h6>Local Storage Settings</h6>
                                 <div class="mb-3">
-                                    <label class="form-label">Select Backup to Restore</label>
-                                    <select class="form-select" id="backupList">
-                                        <option value="">No backups available</option>
+                                    <label class="form-label">Local Data Limit</label>
+                                    <select class="form-select" id="localDataLimit">
+                                        <option value="1000">1,000 records</option>
+                                        <option value="5000" selected>5,000 records</option>
+                                        <option value="10000">10,000 records</option>
+                                        <option value="unlimited">Unlimited</option>
                                     </select>
                                 </div>
                                 
-                                <button class="btn btn-warning" onclick="restoreBackup()" id="restoreBackupBtn">
-                                    <i class="fas fa-undo"></i> Restore Selected Backup
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="autoClearOld" checked>
+                                    <label class="form-check-label" for="autoClearOld">
+                                        Automatically clear old local data
+                                    </label>
+                                </div>
+                                
+                                <button class="btn btn-outline-danger" onclick="clearLocalData()">
+                                    <i class="fas fa-trash"></i> Clear All Local Data
                                 </button>
                             </div>
+                        </div>
+                        
+                        <div class="mt-3">
+                            <button class="btn btn-primary" onclick="saveSettings()">
+                                <i class="fas fa-save"></i> Save Settings
+                            </button>
+                            <button class="btn btn-outline-secondary ms-2" onclick="resetSettings()">
+                                <i class="fas fa-undo"></i> Reset to Defaults
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -1145,660 +768,76 @@
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Integration Manager JavaScript
+        // Integration Manager JavaScript for Google Apps Script
+        let syncLogs = [];
         
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
-            // Set Firebase SDK version if available
-            if (typeof firebase !== 'undefined') {
-                document.getElementById('firebaseSdkVersion').textContent = firebase.SDK_VERSION;
-            }
+            loadSettings();
+            loadSyncLogs();
+            updateSyncStats();
+            loadBackupList();
+            loadGASStats();
             
-            // Setup auto-refresh for Firebase stats if connected
-            setInterval(() => {
-                if (firebaseInitialized) {
-                    loadFirebaseStats();
-                }
-            }, 30000);
+            // Setup auto-refresh for stats
+            setInterval(loadGASStats, 30000);
+            
+            // Test connection on load
+            setTimeout(testGASConnection, 1000);
         });
         
-        // Reinitialize Firebase
-        function reinitializeFirebase() {
-            logDebug("Manually reinitializing Firebase...", "info");
-            initializationAttempts = 0;
-            firebaseInitialized = false;
-            initializeFirebase();
-        }
-        
-        // Clear debug logs
-        function clearDebugLogs() {
-            const debugBox = document.getElementById('debugBox');
-            if (debugBox) {
-                debugBox.innerHTML = '';
-            }
-            logDebug("Debug logs cleared", "info");
-        }
-        
-        // Check Firebase setup
-        async function checkFirebaseSetup() {
-            logDebug("=== Firebase Setup Check ===", "info");
-            
-            // Check Firebase SDK
-            if (typeof firebase === 'undefined') {
-                logDebug("❌ Firebase SDK not loaded", "error");
-                logDebug("Check that Firebase CDN URLs are accessible:", "error");
-                logDebug("https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js", "error");
-                return;
-            }
-            
-            logDebug("✓ Firebase SDK loaded: Version " + firebase.SDK_VERSION, "success");
-            
-            // Check Firebase app
-            if (!firebaseApp) {
-                logDebug("❌ Firebase app not initialized", "error");
-                return;
-            }
-            
-            logDebug("✓ Firebase app initialized: " + firebaseApp.name, "success");
-            
-            // Check Firestore
-            if (!db) {
-                logDebug("❌ Firestore service not available", "error");
-                logDebug("Make sure firebase-firestore.js is included", "error");
-                return;
-            }
-            
-            logDebug("✓ Firestore service available", "success");
-            
-            // Check Authentication
-            if (!auth) {
-                logDebug("⚠ Authentication service not available", "warning");
-            } else {
-                logDebug("✓ Authentication service available", "success");
-            }
-            
-            // Test Firestore connection
-            await testFirestoreAccess();
-        }
-        
-        // Test Firebase authentication
-        async function testFirebaseAuth() {
-            logDebug("Testing Firebase authentication...", "info");
-            
-            if (!auth) {
-                logDebug("❌ Authentication service not initialized", "error");
-                showNotification("Auth service not available", "error");
+        // Load Google Apps Script statistics
+        async function loadGASStats() {
+            if (!isOnline) {
+                document.getElementById('gasRecordCount').value = "Offline - Cannot load";
                 return;
             }
             
             try {
-                // Get current user
-                const currentUser = auth.currentUser;
+                const response = await fetch(`${GAS_WEB_APP_URL}?t=${Date.now()}`);
+                const result = await response.json();
                 
-                if (currentUser) {
-                    logDebug(`✓ User authenticated: ${currentUser.uid}`, "success");
-                    logDebug(`  - Anonymous: ${currentUser.isAnonymous}`, "info");
-                    logDebug(`  - Email: ${currentUser.email || 'No email'}`, "info");
+                if (result.success) {
+                    const count = result.data.length;
+                    document.getElementById('gasRecordCount').value = `${count} records`;
+                    document.getElementById('gasLastSync').value = new Date().toLocaleTimeString();
                     
-                    // Update UI
-                    document.getElementById('authStatus').textContent = 'Authenticated';
-                    document.getElementById('authStatus').className = 'text-success';
-                    document.getElementById('firebaseUserId').textContent = currentUser.uid.substring(0, 8) + '...';
+                    // Count different types of records
+                    let keyCount = 0;
+                    let snagCount = 0;
+                    let handoverCount = 0;
                     
-                    showNotification("Authentication successful!", "success");
-                } else {
-                    logDebug("No user logged in, attempting anonymous auth...", "info");
-                    
-                    // Try anonymous auth
-                    const result = await auth.signInAnonymously();
-                    logDebug(`✓ Anonymous auth successful: ${result.user.uid}`, "success");
-                    
-                    document.getElementById('authStatus').textContent = 'Authenticated (Anonymous)';
-                    document.getElementById('authStatus').className = 'text-success';
-                    document.getElementById('firebaseUserId').textContent = result.user.uid.substring(0, 8) + '...';
-                    
-                    showNotification("Anonymous authentication successful!", "success");
-                }
-                
-            } catch (error) {
-                logDebug(`❌ Auth error: ${error.message} (code: ${error.code})`, "error");
-                
-                // Update UI
-                document.getElementById('authStatus').textContent = `Error: ${error.code}`;
-                document.getElementById('authStatus').className = 'text-danger';
-                
-                showNotification(`Auth error: ${error.message}`, "error");
-                
-                // Provide guidance based on error code
-                if (error.code === 'auth/operation-not-allowed') {
-                    logDebug("Anonymous auth is disabled. Enable it in Firebase Console:", "error");
-                    logDebug("Authentication → Sign-in method → Anonymous → Enable", "error");
-                }
-            }
-        }
-        
-        // Test Firestore access
-        async function testFirestoreAccess() {
-            logDebug("Testing Firestore access...", "info");
-            
-            if (!db) {
-                logDebug("❌ Firestore service not initialized", "error");
-                document.getElementById('firestoreStatus').textContent = 'Not initialized';
-                document.getElementById('firestoreStatus').className = 'text-danger';
-                showNotification("Firestore not available", "error");
-                return;
-            }
-            
-            try {
-                // Try to access a test document
-                const testDocRef = db.collection('_test_connection').doc('test');
-                
-                logDebug("Attempting to write test document...", "info");
-                
-                // Try to set a test document
-                await testDocRef.set({
-                    test: true,
-                    timestamp: new Date().toISOString(),
-                    message: "Firestore connection test"
-                });
-                
-                logDebug("✓ Firestore write successful", "success");
-                
-                // Try to read it back
-                logDebug("Attempting to read test document...", "info");
-                const doc = await testDocRef.get();
-                
-                if (doc.exists) {
-                    logDebug("✓ Firestore read successful", "success");
-                    logDebug(`  Document data: ${JSON.stringify(doc.data())}`, "info");
-                }
-                
-                // Clean up test document
-                logDebug("Cleaning up test document...", "info");
-                await testDocRef.delete();
-                logDebug("✓ Test document cleaned up", "success");
-                
-                // Update UI
-                document.getElementById('firestoreStatus').textContent = 'Connected';
-                document.getElementById('firestoreStatus').className = 'text-success';
-                
-                showNotification("Firestore access successful!", "success");
-                
-                // Also update the main connection status
-                document.getElementById('firebaseTestStatus').className = 'test-status test-success';
-                document.getElementById('firebaseTestStatus').textContent = 'Connected';
-                
-                return true;
-                
-            } catch (error) {
-                logDebug(`❌ Firestore error: ${error.message} (code: ${error.code})`, "error");
-                
-                // Update UI
-                document.getElementById('firestoreStatus').textContent = `Error: ${error.code}`;
-                document.getElementById('firestoreStatus').className = 'text-danger';
-                
-                // Provide specific guidance based on error code
-                if (error.code === 'permission-denied') {
-                    logDebug("Permission denied. Firestore security rules are blocking access.", "error");
-                    logDebug("Go to Firebase Console → Firestore Database → Rules tab", "error");
-                    logDebug("Update rules to allow access. For development, use:", "error");
-                    logDebug("rules_version = '2';", "info");
-                    logDebug("service cloud.firestore {", "info");
-                    logDebug("  match /databases/{database}/documents {", "info");
-                    logDebug("    match /{document=**} {", "info");
-                    logDebug("      allow read, write: if true;", "info");
-                    logDebug("    }", "info");
-                    logDebug("  }", "info");
-                    logDebug("}", "info");
-                    logDebug("Warning: This allows anyone to read/write. Use only for development!", "warning");
-                } else if (error.code === 'failed-precondition') {
-                    logDebug("Firestore database not created.", "error");
-                    logDebug("Go to Firebase Console → Firestore Database → Create Database", "error");
-                } else if (error.code === 'unavailable') {
-                    logDebug("Firestore service unavailable. Check internet connection.", "error");
-                }
-                
-                showNotification(`Firestore error: ${error.message}`, "error");
-                return false;
-            }
-        }
-        
-        // Load Firebase statistics
-        async function loadFirebaseStats() {
-            if (!db || !firebaseInitialized) {
-                document.getElementById('firebaseRecordCount').value = "Not connected";
-                document.getElementById('firebaseLastSync').value = "Not connected";
-                return;
-            }
-            
-            try {
-                const snapshot = await db.collection('hot_process').get();
-                const count = snapshot.size;
-                
-                document.getElementById('firebaseRecordCount').value = `${count} records`;
-                document.getElementById('firebaseLastSync').value = new Date().toLocaleTimeString();
-                
-                // Count different types of records
-                let keyCount = 0;
-                let snagCount = 0;
-                let handoverCount = 0;
-                
-                snapshot.forEach(doc => {
-                    const data = doc.data();
-                    if (data.keyHandover && data.keyHandover.date) keyCount++;
-                    if (data.snagging && data.snagging.status) snagCount++;
-                    if (data.handover && data.handover.date) handoverCount++;
-                });
-                
-                document.getElementById('firebaseKeyCount').textContent = keyCount;
-                document.getElementById('firebaseSnagCount').textContent = snagCount;
-                document.getElementById('firebaseHandoverCount').textContent = handoverCount;
-                
-                logDebug(`Firebase stats loaded: ${count} records`, "success");
-                
-            } catch (error) {
-                console.error("Error loading Firebase stats:", error);
-                document.getElementById('firebaseRecordCount').value = `Error: ${error.code || 'Unknown'}`;
-                logDebug(`Error loading stats: ${error.message}`, "error");
-            }
-        }
-        
-        // Test Firebase connection
-        async function testFirebaseConnection(silent = false) {
-            const statusElement = document.getElementById('firebaseConnectionStatus');
-            const btn = document.getElementById('testFirebaseBtn');
-            const progressBar = document.getElementById('firebaseSyncProgress');
-            const originalHTML = btn ? btn.innerHTML : '';
-            
-            if (statusElement) {
-                statusElement.className = 'test-status test-pending';
-                statusElement.textContent = 'Testing...';
-            }
-            
-            if (btn) {
-                btn.innerHTML = '<span class="loading-spinner"></span> Testing...';
-                btn.disabled = true;
-            }
-            
-            if (progressBar) {
-                progressBar.style.width = '30%';
-                progressBar.className = 'progress-bar bg-warning';
-            }
-            
-            if (!silent) {
-                logDebug("Testing Firebase connection...", "info");
-            }
-            
-            try {
-                // Check if Firebase is initialized
-                if (!firebaseInitialized || !db) {
-                    throw new Error("Firebase not initialized. Click 'Reinitialize Firebase' to try again.");
-                }
-                
-                // Test Firestore connection by getting collection count
-                const snapshot = await db.collection('hot_process').limit(1).get();
-                
-                if (statusElement) {
-                    statusElement.className = 'test-status test-success';
-                    statusElement.textContent = 'Connected';
-                }
-                
-                if (progressBar) {
-                    progressBar.style.width = '100%';
-                    progressBar.className = 'progress-bar bg-success';
-                }
-                
-                if (document.getElementById('firebaseTestStatus')) {
-                    document.getElementById('firebaseTestStatus').className = 'test-status test-success';
-                    document.getElementById('firebaseTestStatus').textContent = 'Connected';
-                }
-                
-                if (!silent) {
-                    logSync('Firebase connection test successful', 'success');
-                    showNotification('✓ Firebase connection successful!', 'success');
-                    logDebug("Firebase connection test passed", "success");
-                }
-                
-                updateConnectionStatus(true);
-                
-            } catch (error) {
-                if (statusElement) {
-                    statusElement.className = 'test-status test-failed';
-                    statusElement.textContent = 'Connection Failed';
-                }
-                
-                if (progressBar) {
-                    progressBar.style.width = '100%';
-                    progressBar.className = 'progress-bar bg-danger';
-                }
-                
-                if (document.getElementById('firebaseTestStatus')) {
-                    document.getElementById('firebaseTestStatus').className = 'test-status test-failed';
-                    document.getElementById('firebaseTestStatus').textContent = 'Failed';
-                }
-                
-                if (!silent) {
-                    logSync('Firebase connection test failed: ' + error.message, 'error');
-                    showNotification('✗ Firebase connection failed: ' + error.message, 'error');
-                    logDebug("Firebase connection test failed: " + error.message, "error");
-                }
-                
-            } finally {
-                if (btn) {
-                    btn.innerHTML = originalHTML;
-                    btn.disabled = false;
-                }
-                
-                // Reset progress bar after 2 seconds
-                if (progressBar) {
-                    setTimeout(() => {
-                        if (progressBar.style.width === '100%') {
-                            progressBar.style.width = '0%';
-                        }
-                    }, 2000);
-                }
-            }
-        }
-        
-        // Sync Firebase to Local Storage
-        async function syncFirebaseToLocal() {
-            const btn = document.getElementById('downloadFirebaseBtn');
-            const originalHTML = btn.innerHTML;
-            
-            btn.innerHTML = '<span class="loading-spinner"></span> Downloading...';
-            btn.disabled = true;
-            
-            showNotification('Downloading data from Firebase...', 'info');
-            logDebug("Starting Firebase to Local sync", "info");
-            
-            try {
-                if (!db || !firebaseInitialized) {
-                    throw new Error("Firebase not connected. Check connection first.");
-                }
-                
-                const snapshot = await db.collection('hot_process').get();
-                
-                // Convert to local data structure
-                const localData = {
-                    towers: {
-                        A: { flats: {} },
-                        B: { flats: {} },
-                        C: { flats: {} }
-                    },
-                    metadata: {
-                        lastSync: new Date().toISOString(),
-                        recordCount: snapshot.size,
-                        source: 'firebase'
-                    }
-                };
-                
-                snapshot.forEach(doc => {
-                    const data = doc.data();
-                    const tower = data.tower || 'A';
-                    const flatNumber = data.flatNumber || '1';
-                    
-                    if (localData.towers[tower]) {
-                        const flatId = `${tower}-${flatNumber}`;
-                        localData.towers[tower].flats[flatId] = data;
-                    }
-                });
-                
-                // Save to localStorage
-                localStorage.setItem('hot_process_data', JSON.stringify(localData));
-                
-                showNotification(`Downloaded ${snapshot.size} records from Firebase!`, 'success');
-                logSync(`Downloaded ${snapshot.size} records from Firebase`, 'success');
-                logDebug(`Firebase to Local sync completed: ${snapshot.size} records`, "success");
-                
-            } catch (error) {
-                console.error("Error syncing from Firebase:", error);
-                showNotification('Error downloading from Firebase: ' + error.message, 'error');
-                logSync('Error downloading from Firebase', 'error');
-                logDebug("Firebase to Local sync error: " + error.message, "error");
-                
-            } finally {
-                btn.innerHTML = originalHTML;
-                btn.disabled = false;
-            }
-        }
-        
-        // Sync Local Storage to Firebase
-        async function syncLocalToFirebase() {
-            const btn = document.getElementById('uploadFirebaseBtn');
-            const originalHTML = btn.innerHTML;
-            
-            btn.innerHTML = '<span class="loading-spinner"></span> Uploading...';
-            btn.disabled = true;
-            
-            showNotification('Uploading local data to Firebase...', 'info');
-            logDebug("Starting Local to Firebase sync", "info");
-            
-            try {
-                if (!db || !firebaseInitialized) {
-                    throw new Error("Firebase not connected. Check connection first.");
-                }
-                
-                // Load from localStorage
-                const localData = JSON.parse(localStorage.getItem('hot_process_data') || '{"towers":{"A":{"flats":{}},"B":{"flats":{}},"C":{"flats":{}}}}');
-                
-                // Save each flat to Firebase
-                let uploadedCount = 0;
-                const errors = [];
-                
-                for (const tower of ['A', 'B', 'C']) {
-                    const flats = localData.towers[tower]?.flats || {};
-                    
-                    for (const [flatId, flatData] of Object.entries(flats)) {
-                        try {
-                            const flatNumber = flatId.split('-')[1];
-                            const firebaseData = {
-                                tower: tower,
-                                flatNumber: flatNumber,
-                                ...flatData,
-                                lastUpdated: new Date().toISOString(),
-                                source: 'local_upload'
-                            };
-                            
-                            await db.collection('hot_process')
-                                .doc(`${tower}_${flatNumber}`)
-                                .set(firebaseData, { merge: true });
-                            
-                            uploadedCount++;
-                            
-                        } catch (error) {
-                            errors.push(`Flat ${flatId}: ${error.message}`);
-                            logDebug(`Upload error for ${flatId}: ${error.message}`, "error");
-                        }
-                    }
-                }
-                
-                if (errors.length > 0) {
-                    showNotification(`Uploaded ${uploadedCount} records, ${errors.length} errors`, 'warning');
-                    console.error("Upload errors:", errors);
-                } else {
-                    showNotification(`${uploadedCount} records uploaded to Firebase!`, 'success');
-                }
-                
-                logSync(`Uploaded ${uploadedCount} records to Firebase`, errors.length > 0 ? 'warning' : 'success');
-                logDebug(`Local to Firebase sync completed: ${uploadedCount} records uploaded`, errors.length > 0 ? "warning" : "success");
-                
-                // Refresh stats
-                loadFirebaseStats();
-                
-            } catch (error) {
-                console.error("Error syncing to Firebase:", error);
-                showNotification('Error uploading to Firebase: ' + error.message, 'error');
-                logSync('Error uploading to Firebase', 'error');
-                logDebug("Local to Firebase sync error: " + error.message, "error");
-                
-            } finally {
-                btn.innerHTML = originalHTML;
-                btn.disabled = false;
-            }
-        }
-        
-        // Export Firebase data
-        async function exportFirebaseData() {
-            const btn = document.getElementById('exportFirebaseBtn');
-            const originalHTML = btn.innerHTML;
-            
-            btn.innerHTML = '<span class="loading-spinner"></span> Exporting...';
-            btn.disabled = true;
-            
-            try {
-                if (!db || !firebaseInitialized) {
-                    throw new Error("Firebase not connected. Check connection first.");
-                }
-                
-                const snapshot = await db.collection('hot_process').get();
-                
-                // Convert to array
-                const data = [];
-                snapshot.forEach(doc => {
-                    data.push({
-                        id: doc.id,
-                        ...doc.data()
+                    result.data.forEach(data => {
+                        if (data.processStep === 'keyHandover') keyCount++;
+                        if (data.processStep === 'snagging') snagCount++;
+                        if (data.processStep === 'handover') handoverCount++;
                     });
-                });
-                
-                // Convert to JSON
-                const dataStr = JSON.stringify(data, null, 2);
-                const dataBlob = new Blob([dataStr], { type: 'application/json' });
-                const url = URL.createObjectURL(dataBlob);
-                
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = `Firebase_Backup_${new Date().toISOString().split('T')[0]}.json`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                URL.revokeObjectURL(url);
-                
-                showNotification(`Exported ${data.length} records from Firebase`, 'success');
-                logSync('Firebase data exported', 'success');
-                logDebug(`Firebase data exported: ${data.length} records`, "success");
+                    
+                    document.getElementById('gasKeyCount').textContent = keyCount;
+                    document.getElementById('gasSnagCount').textContent = snagCount;
+                    document.getElementById('gasHandoverCount').textContent = handoverCount;
+                    
+                    // Update test status
+                    document.getElementById('gasTestStatus').className = 'test-status test-success';
+                    document.getElementById('gasTestStatus').textContent = 'Connected';
+                    
+                } else {
+                    throw new Error(result.error || 'Failed to load');
+                }
                 
             } catch (error) {
-                console.error("Error exporting Firebase data:", error);
-                showNotification('Error exporting Firebase data: ' + error.message, 'error');
-                logDebug("Firebase export error: " + error.message, "error");
-                
-            } finally {
-                btn.innerHTML = originalHTML;
-                btn.disabled = false;
+                console.error("Error loading GAS stats:", error);
+                document.getElementById('gasRecordCount').value = "Error loading";
+                document.getElementById('gasTestStatus').className = 'test-status test-failed';
+                document.getElementById('gasTestStatus').textContent = 'Failed';
             }
         }
         
-        // Clear Firebase data (with confirmation)
-        function clearFirebaseData() {
-            if (confirm('WARNING: This will delete ALL data from Firebase. This action cannot be undone. Are you sure?')) {
-                if (confirm('Are you REALLY sure? This will delete ALL records permanently.')) {
-                    showNotification('Data clearance requires admin privileges. Contact administrator.', 'error');
-                    logSync('Attempted to clear Firebase data (blocked)', 'warning');
-                    logDebug("Firebase data clear attempted (blocked)", "warning");
-                }
-            }
-        }
-        
-        // Refresh Firebase stats
-        function refreshFirebaseStats() {
-            const btn = document.getElementById('refreshFirebaseBtn');
-            const originalHTML = btn.innerHTML;
-            
-            btn.innerHTML = '<span class="loading-spinner"></span> Refreshing...';
-            btn.disabled = true;
-            
-            loadFirebaseStats();
-            
-            setTimeout(() => {
-                btn.innerHTML = originalHTML;
-                btn.disabled = false;
-                showNotification('Firebase stats refreshed', 'success');
-            }, 1000);
-        }
-        
-        // Load configuration from localStorage
-        function loadConfiguration() {
-            // Google Sheets config
-            const googleUrl = localStorage.getItem('google_sheets_url');
-            if (googleUrl) {
-                document.getElementById('googleSheetUrl').value = googleUrl;
-            }
-            
-            const lastSync = localStorage.getItem('google_last_sync');
-            if (lastSync) {
-                document.getElementById('googleLastSync').textContent = 
-                    new Date(lastSync).toLocaleString();
-            }
-            
-            const syncFreq = localStorage.getItem('google_sync_freq') || 'weekly';
-            document.getElementById('googleSyncFreq').value = syncFreq;
-            
-            const autoBackup = localStorage.getItem('google_auto_backup');
-            if (autoBackup !== null) {
-                document.getElementById('googleAutoBackup').checked = autoBackup === 'true';
-            }
-            
-            const backupMode = localStorage.getItem('google_backup_mode') || 'replace';
-            document.getElementById('googleBackupMode').value = backupMode;
-            
-            // Import/Export config
-            const importMode = localStorage.getItem('import_mode') || 'merge';
-            document.getElementById('importMode').value = importMode;
-            
-            const importValidate = localStorage.getItem('import_validate');
-            if (importValidate !== null) {
-                document.getElementById('importValidate').checked = importValidate === 'true';
-            }
-            
-            const importBackup = localStorage.getItem('import_backup');
-            if (importBackup !== null) {
-                document.getElementById('importBackup').checked = importBackup === 'true';
-            }
-            
-            const backupFrequency = localStorage.getItem('backup_frequency') || 'weekly';
-            document.getElementById('backupFrequency').value = backupFrequency;
-        }
-        
-        // Save Google Sheets configuration
-        function saveGoogleConfig() {
-            const btn = document.getElementById('saveGoogleBtn');
-            const originalHTML = btn.innerHTML;
-            
-            btn.innerHTML = '<span class="loading-spinner"></span> Saving...';
-            btn.disabled = true;
-            
-            const url = document.getElementById('googleSheetUrl').value;
-            const syncFreq = document.getElementById('googleSyncFreq').value;
-            const autoBackup = document.getElementById('googleAutoBackup').checked;
-            const backupMode = document.getElementById('googleBackupMode').value;
-            
-            localStorage.setItem('google_sheets_url', url);
-            localStorage.setItem('google_sync_freq', syncFreq);
-            localStorage.setItem('google_auto_backup', autoBackup);
-            localStorage.setItem('google_backup_mode', backupMode);
-            
-            setTimeout(() => {
-                btn.innerHTML = originalHTML;
-                btn.disabled = false;
-                showNotification('Google Sheets configuration saved!', 'success');
-                logSync('Google Sheets configuration updated', 'success');
-            }, 500);
-        }
-        
-        // Test Google Sheets connection
-        function testGoogleConnection() {
-            const url = document.getElementById('googleSheetUrl').value;
-            
-            if (!url) {
-                alert('Please enter Google Sheets URL first');
-                return;
-            }
-            
-            // Show testing status
-            const statusElement = document.getElementById('googleConnectionStatus');
-            const btn = document.getElementById('testGoogleBtn');
-            const progressBar = document.getElementById('googleSyncProgress');
+        // Test Google Apps Script connection
+        async function testGASConnection() {
+            const statusElement = document.getElementById('gasConnectionStatus');
+            const btn = document.getElementById('testGASBtn');
+            const progressBar = document.getElementById('gasSyncProgress');
             const originalHTML = btn.innerHTML;
             
             statusElement.className = 'test-status test-pending';
@@ -1808,249 +847,93 @@
             progressBar.style.width = '30%';
             progressBar.className = 'progress-bar bg-warning';
             
-            // Simulate connection test with timeout
-            setTimeout(() => {
-                // Check if URL looks like a Google Sheets URL
-                if (url.includes('docs.google.com/spreadsheets')) {
+            try {
+                const startTime = Date.now();
+                const response = await fetch(`${GAS_WEB_APP_URL}?t=${Date.now()}`);
+                const endTime = Date.now();
+                const responseTime = endTime - startTime;
+                
+                const result = await response.json();
+                
+                if (result.success) {
                     statusElement.className = 'test-status test-success';
-                    statusElement.textContent = 'Connected';
+                    statusElement.textContent = `Connected (${responseTime}ms)`;
                     progressBar.style.width = '100%';
                     progressBar.className = 'progress-bar bg-success';
                     
-                    // Update global test status
-                    document.getElementById('googleTestStatus').className = 'test-status test-success';
-                    document.getElementById('googleTestStatus').textContent = 'Connected';
+                    document.getElementById('gasTestStatus').className = 'test-status test-success';
+                    document.getElementById('gasTestStatus').textContent = 'Connected';
                     
-                    logSync('Google Sheets connection test successful', 'success');
-                    showNotification('✓ Google Sheets connection successful!', 'success');
+                    logSync(`Google Apps Script connection test successful - ${responseTime}ms`, 'success');
+                    showNotification('✓ Google Apps Script connection successful!', 'success');
+                    
                 } else {
-                    statusElement.className = 'test-status test-failed';
-                    statusElement.textContent = 'Connection Failed';
-                    progressBar.style.width = '100%';
-                    progressBar.className = 'progress-bar bg-danger';
-                    
-                    // Update global test status
-                    document.getElementById('googleTestStatus').className = 'test-status test-failed';
-                    document.getElementById('googleTestStatus').textContent = 'Failed';
-                    
-                    logSync('Google Sheets connection test failed - Invalid URL format', 'error');
-                    showNotification('✗ Invalid Google Sheets URL format', 'error');
+                    throw new Error(result.error || 'Failed to connect');
                 }
-                
-                btn.innerHTML = originalHTML;
-                btn.disabled = false;
-                
-                // Reset progress bar after 2 seconds
-                setTimeout(() => {
-                    progressBar.style.width = '0%';
-                }, 2000);
-                
-            }, 1500);
-        }
-        
-        // Backup to Google Sheets
-        function backupToGoogleSheets() {
-            const url = document.getElementById('googleSheetUrl').value;
-            
-            if (!url) {
-                alert('Please configure Google Sheets URL first');
-                return;
-            }
-            
-            // Show backup in progress
-            const btn = document.getElementById('backupGoogleBtn');
-            const progressBar = document.getElementById('googleSyncProgress');
-            const originalHTML = btn.innerHTML;
-            
-            btn.innerHTML = '<span class="loading-spinner"></span> Backing up...';
-            btn.disabled = true;
-            progressBar.style.width = '10%';
-            progressBar.className = 'progress-bar bg-primary';
-            
-            // Simulate backup with progress updates
-            let progress = 10;
-            const progressInterval = setInterval(() => {
-                progress += 10;
-                progressBar.style.width = `${progress}%`;
-                
-                if (progress >= 90) {
-                    clearInterval(progressInterval);
-                }
-            }, 300);
-            
-            // Simulate backup completion
-            setTimeout(() => {
-                clearInterval(progressInterval);
-                progressBar.style.width = '100%';
-                progressBar.className = 'progress-bar bg-success';
-                
-                // Update last sync time
-                const now = new Date();
-                localStorage.setItem('google_last_sync', now.toISOString());
-                document.getElementById('googleLastSync').textContent = now.toLocaleString();
-                
-                logSync('Google Sheets backup completed', 'success');
-                
-                btn.innerHTML = originalHTML;
-                btn.disabled = false;
-                
-                // Reset progress bar after 2 seconds
-                setTimeout(() => {
-                    progressBar.style.width = '0%';
-                }, 2000);
-                
-                showNotification('✓ Data backed up to Google Sheets!', 'success');
-                
-            }, 3000);
-        }
-        
-        // Setup Google Sheets template
-        function setupGoogleSheets() {
-            alert('Setup Instructions:\n\n1. Create a new Google Sheet\n2. Name it "HOTO Process Backup"\n3. Set sharing permissions to "Anyone with the link can edit"\n4. Copy the URL and paste above\n5. Test the connection\n\nNote: This is a simulated backup for demonstration purposes.');
-        }
-        
-        // Validate Google Sheets URL
-        function validateGoogleSheetURL() {
-            const url = document.getElementById('googleSheetUrl').value;
-            
-            if (!url) {
-                alert('Please enter Google Sheets URL first');
-                return;
-            }
-            
-            const isValid = url.includes('docs.google.com/spreadsheets');
-            
-            if (isValid) {
-                showNotification('✓ Valid Google Sheets URL format', 'success');
-                document.getElementById('googleConnectionStatus').className = 'test-status test-pending';
-                document.getElementById('googleConnectionStatus').textContent = 'Not Tested';
-            } else {
-                showNotification('✗ Invalid Google Sheets URL format', 'error');
-                document.getElementById('googleConnectionStatus').className = 'test-status test-failed';
-                document.getElementById('googleConnectionStatus').textContent = 'Invalid URL';
-            }
-        }
-        
-        // Export data
-        async function exportData() {
-            const btn = document.getElementById('exportDataBtn');
-            const originalHTML = btn.innerHTML;
-            
-            btn.innerHTML = '<span class="loading-spinner"></span> Exporting...';
-            btn.disabled = true;
-            
-            try {
-                // Get format
-                const format = document.getElementById('exportFormat').value;
-                
-                // Try to get data from Firebase first
-                let data = [];
-                
-                if (firebaseInitialized && db) {
-                    try {
-                        const snapshot = await db.collection('hot_process').get();
-                        snapshot.forEach(doc => {
-                            data.push(doc.data());
-                        });
-                    } catch (firebaseError) {
-                        console.warn("Firebase export failed, trying localStorage:", firebaseError);
-                        // Fall back to localStorage
-                        const localData = JSON.parse(localStorage.getItem('hot_process_data') || '{"towers":{"A":{"flats":{}},"B":{"flats":{}},"C":{"flats":{}}}}');
-                        // Extract data from localStorage structure
-                        for (const tower of ['A', 'B', 'C']) {
-                            const flats = localData.towers[tower]?.flats || {};
-                            Object.values(flats).forEach(flat => {
-                                data.push(flat);
-                            });
-                        }
-                    }
-                } else {
-                    // Use localStorage only
-                    const localData = JSON.parse(localStorage.getItem('hot_process_data') || '{"towers":{"A":{"flats":{}},"B":{"flats":{}},"C":{"flats":{}}}}');
-                    for (const tower of ['A', 'B', 'C']) {
-                        const flats = localData.towers[tower]?.flats || {};
-                        Object.values(flats).forEach(flat => {
-                            data.push(flat);
-                        });
-                    }
-                }
-                
-                let dataStr, filename, mimeType;
-                
-                switch(format) {
-                    case 'json':
-                        dataStr = JSON.stringify(data, null, 2);
-                        filename = `HOTO_Export_${new Date().toISOString().split('T')[0]}.json`;
-                        mimeType = 'application/json';
-                        break;
-                        
-                    case 'csv':
-                        dataStr = convertToCSV(data);
-                        filename = `HOTO_Export_${new Date().toISOString().split('T')[0]}.csv`;
-                        mimeType = 'text/csv';
-                        break;
-                        
-                    case 'xlsx':
-                        // For Excel, create worksheet
-                        const wsData = [
-                            ['Tower', 'Flat', 'Key Handover', 'Snagging', 'First Visit', 'Handover', 'Interiors', 'Move-in', 'Last Updated']
-                        ];
-                        
-                        data.forEach(item => {
-                            wsData.push([
-                                item.tower || '',
-                                item.flatNumber || '',
-                                item.keyHandover?.date || '',
-                                item.snagging?.status || '',
-                                item.firstVisit?.visitDate || '',
-                                item.handover?.date || '',
-                                item.interiors?.status || '',
-                                item.movein?.date || '',
-                                item.lastUpdated || ''
-                            ]);
-                        });
-                        
-                        // Use SheetJS
-                        if (typeof XLSX !== 'undefined') {
-                            const ws = XLSX.utils.aoa_to_sheet(wsData);
-                            const wb = XLSX.utils.book_new();
-                            XLSX.utils.book_append_sheet(wb, ws, "HOTO_Process_Data");
-                            
-                            filename = `HOTO_Export_${new Date().toISOString().split('T')[0]}.xlsx`;
-                            XLSX.writeFile(wb, filename);
-                            
-                            showNotification(`Excel exported successfully! (${data.length} records)`, 'success');
-                            logSync('Data exported to Excel', 'success');
-                            
-                            btn.innerHTML = originalHTML;
-                            btn.disabled = false;
-                            return;
-                        } else {
-                            alert('SheetJS library not available. Please use JSON or CSV format.');
-                            btn.innerHTML = originalHTML;
-                            btn.disabled = false;
-                            return;
-                        }
-                }
-                
-                // Download file for JSON and CSV
-                const blob = new Blob([dataStr], { type: mimeType });
-                const url = URL.createObjectURL(blob);
-                
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = filename;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                URL.revokeObjectURL(url);
-                
-                showNotification(`Data exported successfully (${data.length} records)`, 'success');
-                logSync(`Data exported (${data.length} records)`, 'success');
                 
             } catch (error) {
-                console.error("Error exporting data:", error);
-                showNotification('Error exporting data: ' + error.message, 'error');
+                statusElement.className = 'test-status test-failed';
+                statusElement.textContent = 'Connection Failed';
+                progressBar.style.width = '100%';
+                progressBar.className = 'progress-bar bg-danger';
+                
+                document.getElementById('gasTestStatus').className = 'test-status test-failed';
+                document.getElementById('gasTestStatus').textContent = 'Failed';
+                
+                logSync('Google Apps Script connection test failed: ' + error.message, 'error');
+                showNotification('✗ Google Apps Script connection failed', 'error');
+                
+            } finally {
+                btn.innerHTML = originalHTML;
+                btn.disabled = false;
+                
+                // Reset progress bar after 2 seconds
+                setTimeout(() => {
+                    if (progressBar.style.width === '100%') {
+                        progressBar.style.width = '0%';
+                    }
+                }, 2000);
+            }
+        }
+        
+        // Sync data from Google Apps Script to local storage
+        async function syncFromGAS() {
+            if (!isOnline) {
+                showNotification('You are offline. Cannot sync from cloud.', 'warning');
+                return;
+            }
+            
+            const btn = document.getElementById('downloadGASBtn');
+            const originalHTML = btn.innerHTML;
+            
+            btn.innerHTML = '<span class="loading-spinner"></span> Downloading...';
+            btn.disabled = true;
+            
+            showNotification('Downloading data from Google Apps Script...', 'info');
+            
+            try {
+                const response = await fetch(`${GAS_WEB_APP_URL}?t=${Date.now()}`);
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Save to local storage
+                    localStorage.setItem('hot_process_data', JSON.stringify(result.data));
+                    localStorage.setItem('last_sync_time', new Date().toISOString());
+                    
+                    showNotification(`Downloaded ${result.data.length} records from cloud!`, 'success');
+                    logSync(`Downloaded ${result.data.length} records from Google Apps Script`, 'success');
+                    
+                    // Refresh stats
+                    loadGASStats();
+                    
+                } else {
+                    throw new Error(result.error || 'Failed to download');
+                }
+                
+            } catch (error) {
+                console.error("Error syncing from GAS:", error);
+                showNotification('Error downloading from cloud: ' + error.message, 'error');
+                logSync('Error downloading from Google Apps Script', 'error');
                 
             } finally {
                 btn.innerHTML = originalHTML;
@@ -2058,42 +941,265 @@
             }
         }
         
-        // Convert data to CSV
-        function convertToCSV(data) {
-            let csv = 'Tower,Flat,Key Handover Date,Snagging Status,First Visit Date,Handover Date,Interiors Status,Move-in Date,Last Updated\n';
+        // Sync data from local storage to Google Apps Script
+        async function syncToGAS() {
+            if (!isOnline) {
+                showNotification('You are offline. Cannot sync to cloud.', 'warning');
+                return;
+            }
             
-            data.forEach(item => {
-                csv += `"${item.tower || ''}","${item.flatNumber || ''}","${item.keyHandover?.date || ''}","${item.snagging?.status || ''}","${item.firstVisit?.visitDate || ''}","${item.handover?.date || ''}","${item.interiors?.status || ''}","${item.movein?.date || ''}","${item.lastUpdated || ''}"\n`;
-            });
+            const btn = document.getElementById('uploadGASBtn');
+            const originalHTML = btn.innerHTML;
             
-            return csv;
+            btn.innerHTML = '<span class="loading-spinner"></span> Uploading...';
+            btn.disabled = true;
+            
+            showNotification('Uploading local data to Google Apps Script...', 'info');
+            
+            try {
+                // Get local data
+                const localData = JSON.parse(localStorage.getItem('hot_process_data') || '[]');
+                
+                // Upload each record
+                let uploadedCount = 0;
+                const errors = [];
+                
+                for (const data of localData) {
+                    try {
+                        const response = await fetch(GAS_WEB_APP_URL, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                ...data,
+                                updatedBy: deviceId,
+                                timestamp: new Date().toISOString()
+                            })
+                        });
+                        
+                        const result = await response.json();
+                        if (result.success) {
+                            uploadedCount++;
+                        } else {
+                            errors.push(`Record ${data.id}: ${result.error}`);
+                        }
+                        
+                    } catch (error) {
+                        errors.push(`Record ${data.id}: ${error.message}`);
+                    }
+                }
+                
+                if (errors.length > 0) {
+                    showNotification(`Uploaded ${uploadedCount} records, ${errors.length} errors`, 'warning');
+                    console.error("Upload errors:", errors);
+                } else {
+                    showNotification(`${uploadedCount} records uploaded to Google Apps Script!`, 'success');
+                }
+                
+                logSync(`Uploaded ${uploadedCount} records to Google Apps Script`, errors.length > 0 ? 'warning' : 'success');
+                
+                // Refresh stats
+                loadGASStats();
+                
+            } catch (error) {
+                console.error("Error syncing to GAS:", error);
+                showNotification('Error uploading to cloud: ' + error.message, 'error');
+                logSync('Error uploading to Google Apps Script', 'error');
+                
+            } finally {
+                btn.innerHTML = originalHTML;
+                btn.disabled = false;
+            }
         }
         
-        // Import data
-        function importData() {
-            showNotification('Redirecting to Excel Processor page...', 'info');
-            // Redirect to Excel processor page
+        // Export Google Apps Script data
+        async function exportGASData() {
+            if (!isOnline) {
+                showNotification('You are offline. Cannot export from cloud.', 'warning');
+                return;
+            }
+            
+            const btn = document.getElementById('exportGASBtn');
+            const originalHTML = btn.innerHTML;
+            
+            btn.innerHTML = '<span class="loading-spinner"></span> Exporting...';
+            btn.disabled = true;
+            
+            try {
+                const response = await fetch(`${GAS_WEB_APP_URL}?t=${Date.now()}`);
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Convert to JSON file
+                    const dataStr = JSON.stringify(result.data, null, 2);
+                    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+                    const url = URL.createObjectURL(dataBlob);
+                    
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `HOTO_Cloud_Backup_${new Date().toISOString().split('T')[0]}.json`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+                    
+                    showNotification(`Exported ${result.data.length} records from cloud`, 'success');
+                    logSync('Google Apps Script data exported', 'success');
+                    
+                } else {
+                    throw new Error(result.error || 'Failed to export');
+                }
+                
+            } catch (error) {
+                console.error("Error exporting GAS data:", error);
+                showNotification('Error exporting cloud data: ' + error.message, 'error');
+                
+            } finally {
+                btn.innerHTML = originalHTML;
+                btn.disabled = false;
+            }
+        }
+        
+        // Refresh Google Apps Script stats
+        function refreshGASStats() {
+            const btn = document.getElementById('refreshGASBtn');
+            const originalHTML = btn.innerHTML;
+            
+            btn.innerHTML = '<span class="loading-spinner"></span> Refreshing...';
+            btn.disabled = true;
+            
+            loadGASStats();
+            
             setTimeout(() => {
-                window.location.href = 'excel-processor.html';
+                btn.innerHTML = originalHTML;
+                btn.disabled = false;
+                showNotification('Cloud stats refreshed', 'success');
             }, 1000);
+        }
+        
+        // Open Google Sheet (this would open the actual Google Sheet)
+        function openGoogleSheet() {
+            showNotification('Google Sheets integration is automatic via Google Apps Script.', 'info');
+            // Note: You would need the actual Google Sheet URL here
+        }
+        
+        // Copy to clipboard
+        function copyToClipboard(button) {
+            const input = button.parentNode.querySelector('input');
+            input.select();
+            document.execCommand('copy');
+            
+            const originalHTML = button.innerHTML;
+            button.innerHTML = '<i class="fas fa-check"></i> Copied!';
+            
+            setTimeout(() => {
+                button.innerHTML = originalHTML;
+            }, 2000);
+        }
+        
+        // Load settings
+        function loadSettings() {
+            const gasUrl = localStorage.getItem('gas_url') || GAS_WEB_APP_URL;
+            document.getElementById('gasUrl').value = gasUrl;
+            
+            const syncInterval = localStorage.getItem('sync_interval') || '30';
+            document.getElementById('syncInterval').value = syncInterval;
+            
+            const autoSync = localStorage.getItem('auto_sync');
+            if (autoSync !== null) {
+                document.getElementById('gasAutoSync').checked = autoSync === 'true';
+            }
+            
+            const offlineSupport = localStorage.getItem('offline_support');
+            if (offlineSupport !== null) {
+                document.getElementById('gasOffline').checked = offlineSupport === 'true';
+            }
+            
+            const backupFreq = localStorage.getItem('backup_frequency') || 'weekly';
+            document.getElementById('backupFrequency').value = backupFreq;
+            
+            const dataLimit = localStorage.getItem('data_limit') || '5000';
+            document.getElementById('localDataLimit').value = dataLimit;
+            
+            const autoClear = localStorage.getItem('auto_clear');
+            if (autoClear !== null) {
+                document.getElementById('autoClearOld').checked = autoClear === 'true';
+            }
+        }
+        
+        // Save settings
+        function saveSettings() {
+            const gasUrl = document.getElementById('gasUrl').value;
+            const syncInterval = document.getElementById('syncInterval').value;
+            const autoSync = document.getElementById('gasAutoSync').checked;
+            const offlineSupport = document.getElementById('gasOffline').checked;
+            const backupFreq = document.getElementById('backupFrequency').value;
+            const dataLimit = document.getElementById('localDataLimit').value;
+            const autoClear = document.getElementById('autoClearOld').checked;
+            
+            localStorage.setItem('gas_url', gasUrl);
+            localStorage.setItem('sync_interval', syncInterval);
+            localStorage.setItem('auto_sync', autoSync);
+            localStorage.setItem('offline_support', offlineSupport);
+            localStorage.setItem('backup_frequency', backupFreq);
+            localStorage.setItem('data_limit', dataLimit);
+            localStorage.setItem('auto_clear', autoClear);
+            
+            showNotification('Settings saved successfully!', 'success');
+            logSync('Integration settings updated', 'success');
+        }
+        
+        // Reset settings
+        function resetSettings() {
+            if (confirm('Are you sure you want to reset all settings to defaults?')) {
+                localStorage.removeItem('gas_url');
+                localStorage.removeItem('sync_interval');
+                localStorage.removeItem('auto_sync');
+                localStorage.removeItem('offline_support');
+                localStorage.removeItem('backup_frequency');
+                localStorage.removeItem('data_limit');
+                localStorage.removeItem('auto_clear');
+                
+                loadSettings();
+                showNotification('Settings reset to defaults', 'success');
+                logSync('Settings reset to defaults', 'warning');
+            }
+        }
+        
+        // Clear local data
+        function clearLocalData() {
+            if (confirm('WARNING: This will delete ALL local data. This cannot be undone. Are you sure?')) {
+                if (confirm('Are you REALLY sure? This will delete all local records permanently.')) {
+                    localStorage.removeItem('hot_process_data');
+                    localStorage.removeItem('hot_pending_changes');
+                    localStorage.removeItem('last_sync_time');
+                    
+                    showNotification('All local data cleared', 'success');
+                    logSync('All local data cleared', 'warning');
+                    
+                    // Refresh stats
+                    loadGASStats();
+                }
+            }
         }
         
         // Load sync logs
         function loadSyncLogs() {
-            const logs = JSON.parse(localStorage.getItem('sync_logs') || '[]');
+            syncLogs = JSON.parse(localStorage.getItem('sync_logs') || '[]');
             const logsContainer = document.getElementById('syncLogs');
             const searchTerm = document.getElementById('logSearch').value.toLowerCase();
             const filterType = document.getElementById('logFilter').value;
             
             logsContainer.innerHTML = '';
             
-            if (logs.length === 0) {
+            if (syncLogs.length === 0) {
                 logsContainer.innerHTML = '<p class="text-muted text-center py-3">No sync logs yet</p>';
                 return;
             }
             
             // Filter logs
-            const filteredLogs = logs.filter(log => {
+            const filteredLogs = syncLogs.filter(log => {
                 // Search filter
                 if (searchTerm && !log.message.toLowerCase().includes(searchTerm)) {
                     return false;
@@ -2134,43 +1240,35 @@
                 
                 logsContainer.appendChild(logItem);
             });
-        }
-        
-        // Search logs
-        function searchLogs() {
-            loadSyncLogs();
+            
+            updateSyncStats();
         }
         
         // Log sync activity
         function logSync(message, type) {
-            const logs = JSON.parse(localStorage.getItem('sync_logs') || '[]');
-            
-            logs.push({
+            syncLogs.push({
                 timestamp: new Date().toISOString(),
                 message: message,
                 type: type
             });
             
             // Keep only last 1000 logs
-            if (logs.length > 1000) {
-                logs.splice(0, logs.length - 1000);
+            if (syncLogs.length > 1000) {
+                syncLogs.splice(0, syncLogs.length - 1000);
             }
             
-            localStorage.setItem('sync_logs', JSON.stringify(logs));
+            localStorage.setItem('sync_logs', JSON.stringify(syncLogs));
             
             // Refresh logs display
             loadSyncLogs();
-            updateSyncStats();
         }
         
         // Update sync statistics
         function updateSyncStats() {
-            const logs = JSON.parse(localStorage.getItem('sync_logs') || '[]');
-            
-            const total = logs.length;
-            const success = logs.filter(log => log.type === 'success').length;
-            const failed = logs.filter(log => log.type === 'error').length;
-            const warning = logs.filter(log => log.type === 'warning').length;
+            const total = syncLogs.length;
+            const success = syncLogs.filter(log => log.type === 'success').length;
+            const failed = syncLogs.filter(log => log.type === 'error').length;
+            const warning = syncLogs.filter(log => log.type === 'warning').length;
             
             document.getElementById('totalSyncs').textContent = total;
             document.getElementById('successSyncs').textContent = success;
@@ -2178,25 +1276,27 @@
             document.getElementById('pendingSyncs').textContent = warning;
         }
         
+        // Search logs
+        function searchLogs() {
+            loadSyncLogs();
+        }
+        
         // Refresh logs
         function refreshLogs() {
             loadSyncLogs();
-            updateSyncStats();
             showNotification('Logs refreshed', 'success');
         }
         
         // Export logs
         function exportLogs() {
-            const logs = JSON.parse(localStorage.getItem('sync_logs') || '[]');
-            
-            if (logs.length === 0) {
+            if (syncLogs.length === 0) {
                 alert('No logs to export');
                 return;
             }
             
             let csvContent = 'Timestamp,Type,Message\n';
             
-            logs.forEach(log => {
+            syncLogs.forEach(log => {
                 csvContent += `"${log.timestamp}","${log.type}","${log.message.replace(/"/g, '""')}"\n`;
             });
             
@@ -2217,9 +1317,9 @@
         // Clear logs
         function clearLogs() {
             if (confirm('Are you sure you want to clear all sync logs? This cannot be undone.')) {
+                syncLogs = [];
                 localStorage.setItem('sync_logs', JSON.stringify([]));
                 loadSyncLogs();
-                updateSyncStats();
                 logSync('All sync logs cleared', 'warning');
                 showNotification('Sync logs cleared!', 'success');
             }
@@ -2228,15 +1328,13 @@
         // Test all connections
         function testAllConnections() {
             showNotification('Testing all connections...', 'info');
-            
-            testFirebaseConnection();
-            setTimeout(testGoogleConnection, 1000);
+            testGASConnection();
         }
         
         // Force sync
         function forceSync() {
-            if (confirm('Force sync will upload all local data to Firebase immediately. Continue?')) {
-                syncLocalToFirebase();
+            if (confirm('Force sync will upload all local data to Google Apps Script immediately. Continue?')) {
+                syncToGAS();
             }
         }
         
@@ -2248,13 +1346,15 @@
             btn.innerHTML = '<span class="loading-spinner"></span> Creating...';
             btn.disabled = true;
             
-            const localData = localStorage.getItem('hot_process_data');
+            const hotData = localStorage.getItem('hot_process_data');
+            const pendingChanges = localStorage.getItem('hot_pending_changes');
             const syncLogs = localStorage.getItem('sync_logs');
             
             const backup = {
                 timestamp: new Date().toISOString(),
-                data: localData,
-                logs: syncLogs,
+                hotData: hotData,
+                pendingChanges: pendingChanges,
+                syncLogs: syncLogs,
                 version: '1.0'
             };
             
@@ -2330,12 +1430,16 @@
             }
             
             // Restore data
-            if (backup.data) {
-                localStorage.setItem('hot_process_data', backup.data);
+            if (backup.hotData) {
+                localStorage.setItem('hot_process_data', backup.hotData);
             }
             
-            if (backup.logs) {
-                localStorage.setItem('sync_logs', backup.logs);
+            if (backup.pendingChanges) {
+                localStorage.setItem('hot_pending_changes', backup.pendingChanges);
+            }
+            
+            if (backup.syncLogs) {
+                localStorage.setItem('sync_logs', backup.syncLogs);
             }
             
             setTimeout(() => {
@@ -2344,10 +1448,9 @@
                 logSync(`Backup restored from ${new Date(backup.timestamp).toLocaleString()}`, 'success');
                 showNotification('Backup restored successfully!', 'success');
                 
-                // Reload configuration
-                loadConfiguration();
+                // Reload data
                 loadSyncLogs();
-                updateSyncStats();
+                loadGASStats();
                 
                 // Show reload suggestion
                 setTimeout(() => {
@@ -2358,9 +1461,107 @@
             }, 1000);
         }
         
+        // Export data
+        function exportData() {
+            // Get format
+            const format = document.getElementById('exportFormat').value;
+            
+            // Get data from local storage
+            const data = JSON.parse(localStorage.getItem('hot_process_data') || '[]');
+            
+            if (data.length === 0) {
+                alert('No data to export');
+                return;
+            }
+            
+            let dataStr, filename, mimeType;
+            
+            switch(format) {
+                case 'json':
+                    dataStr = JSON.stringify(data, null, 2);
+                    filename = `HOTO_Export_${new Date().toISOString().split('T')[0]}.json`;
+                    mimeType = 'application/json';
+                    break;
+                    
+                case 'csv':
+                    dataStr = convertToCSV(data);
+                    filename = `HOTO_Export_${new Date().toISOString().split('T')[0]}.csv`;
+                    mimeType = 'text/csv';
+                    break;
+                    
+                case 'xlsx':
+                    // For Excel, create worksheet
+                    const wsData = [
+                        ['Tower', 'Flat', 'Process Step', 'Status', 'Date', 'Created By', 'Last Updated']
+                    ];
+                    
+                    data.forEach(item => {
+                        wsData.push([
+                            item.tower || '',
+                            item.flatNumber || '',
+                            item.processStep || '',
+                            item.stepData?.status || '',
+                            item.stepData?.date || '',
+                            item.createdBy || '',
+                            item.updatedBy || ''
+                        ]);
+                    });
+                    
+                    // Use SheetJS
+                    if (typeof XLSX !== 'undefined') {
+                        const ws = XLSX.utils.aoa_to_sheet(wsData);
+                        const wb = XLSX.utils.book_new();
+                        XLSX.utils.book_append_sheet(wb, ws, "HOTO_Process_Data");
+                        
+                        filename = `HOTO_Export_${new Date().toISOString().split('T')[0]}.xlsx`;
+                        XLSX.writeFile(wb, filename);
+                        
+                        showNotification(`Excel exported successfully! (${data.length} records)`, 'success');
+                        logSync('Data exported to Excel', 'success');
+                        return;
+                    } else {
+                        alert('SheetJS library not available. Please use JSON or CSV format.');
+                        return;
+                    }
+            }
+            
+            // Download file for JSON and CSV
+            const blob = new Blob([dataStr], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            
+            showNotification(`Data exported successfully (${data.length} records)`, 'success');
+            logSync(`Data exported (${data.length} records)`, 'success');
+        }
+        
+        // Convert data to CSV
+        function convertToCSV(data) {
+            let csv = 'Tower,Flat,Process Step,Status,Date,Created By,Last Updated\n';
+            
+            data.forEach(item => {
+                csv += `"${item.tower || ''}","${item.flatNumber || ''}","${item.processStep || ''}","${item.stepData?.status || ''}","${item.stepData?.date || ''}","${item.createdBy || ''}","${item.updatedBy || ''}"\n`;
+            });
+            
+            return csv;
+        }
+        
+        // Import data
+        function importData() {
+            showNotification('Use the Excel Processor page for data import', 'info');
+            setTimeout(() => {
+                window.location.href = 'excel-processor.html';
+            }, 1000);
+        }
+        
         // Show notification
         function showNotification(message, type) {
-            // Create notification element
             const notification = document.createElement('div');
             notification.className = `alert alert-${type} alert-dismissible fade show`;
             notification.style.position = 'fixed';
@@ -2375,7 +1576,6 @@
             
             document.body.appendChild(notification);
             
-            // Auto remove after 5 seconds
             setTimeout(() => {
                 if (notification.parentNode) {
                     notification.remove();
