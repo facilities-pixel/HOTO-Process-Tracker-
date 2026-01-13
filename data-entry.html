@@ -6,6 +6,10 @@
     <title>Data Entry - HOTO Process</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js"></script>
     <style>
         :root {
             --cbre-blue: #1F3765;
@@ -211,6 +215,30 @@
     </style>
 </head>
 <body>
+    <!-- Firebase Configuration -->
+    <script>
+        // Initialize Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyBZoECRF1wzKzeqyJcaW2uAszbJylpeCkU",
+            authDomain: "hotoprocess.firebaseapp.com",
+            projectId: "hotoprocess",
+            storageBucket: "hotoprocess.firebasestorage.app",
+            messagingSenderId: "958524591846",
+            appId: "1:958524591846:web:b51c86974c212d01fe7527",
+            measurementId: "G-7KWHXLSP2J"
+        };
+        
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+        
+        // Initialize with anonymous auth
+        auth.signInAnonymously().catch(function(error) {
+            console.error("Auth error:", error);
+        });
+    </script>
+    
     <div class="container-fluid">
         <div class="row">
             <!-- Sidebar -->
@@ -269,22 +297,22 @@
                                 <span id="todayEntries">0</span>
                             </div>
                             <div class="d-flex justify-content-between">
-                                <span>Saved Locally:</span>
-                                <span id="localSaved">0</span>
+                                <span>Saved Cloud:</span>
+                                <span id="cloudSaved">0</span>
                             </div>
                             <div class="d-flex justify-content-between">
-                                <span>Synced Online:</span>
-                                <span id="syncedCount">0</span>
+                                <span>Sync Status:</span>
+                                <span id="syncStatus">Online</span>
                             </div>
                         </div>
                     </div>
                     
                     <div class="px-3 mt-3">
-                        <button class="btn btn-outline-primary btn-sm w-100 mb-2" onclick="saveAllData()">
-                            <i class="fas fa-save"></i> Save All
-                        </button>
-                        <button class="btn btn-primary btn-sm w-100" onclick="syncData()">
+                        <button class="btn btn-outline-primary btn-sm w-100 mb-2" onclick="saveAllToCloud()">
                             <i class="fas fa-cloud-upload-alt"></i> Sync to Cloud
+                        </button>
+                        <button class="btn btn-primary btn-sm w-100" onclick="loadFromCloud()">
+                            <i class="fas fa-cloud-download-alt"></i> Load from Cloud
                         </button>
                     </div>
                 </div>
@@ -858,7 +886,7 @@
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Data Entry JavaScript
+        // Data Entry JavaScript with Firebase
         let currentFloor = 1;
         let selectedFlat = null;
         let currentStep = 1;
@@ -867,6 +895,11 @@
         document.addEventListener('DOMContentLoaded', function() {
             updateStats();
             setDefaultDates();
+            checkSyncStatus();
+            
+            // Update sync status when network changes
+            window.addEventListener('online', updateSyncStatus);
+            window.addEventListener('offline', updateSyncStatus);
         });
         
         // Set default dates
@@ -1032,8 +1065,8 @@
             form.classList.toggle('active');
         }
         
-        // Save key handover
-        function saveKeyHandover() {
+        // Save key handover to Firebase
+        async function saveKeyHandover() {
             const tower = document.getElementById('keyTower').value;
             const person = document.getElementById('keyPerson').value;
             const date = document.getElementById('keyDate').value;
@@ -1056,40 +1089,53 @@
                 return;
             }
             
-            // Save to localStorage
-            let hotData = JSON.parse(localStorage.getItem('hot_process_data') || '{"towers":{"A":{"flats":{}},"B":{"flats":{}},"C":{"flats":{}}}}');
-            
-            const flatId = `${tower}-${selectedFlat}`;
-            if (!hotData.towers[tower].flats[flatId]) {
-                hotData.towers[tower].flats[flatId] = {};
-            }
-            
-            hotData.towers[tower].flats[flatId].keyHandover = {
-                date: date,
-                person: person,
-                incompleteKeys: incompleteKeys,
-                remarks: incompleteKeys ? remarks : null,
-                status: 'completed',
-                timestamp: new Date().toISOString()
+            // Prepare data for Firebase
+            const keyHandoverData = {
+                tower: tower,
+                flatNumber: selectedFlat,
+                keyHandover: {
+                    date: date,
+                    person: person,
+                    incompleteKeys: incompleteKeys,
+                    remarks: incompleteKeys ? remarks : null,
+                    status: 'completed',
+                    timestamp: new Date().toISOString()
+                },
+                lastUpdated: new Date().toISOString()
             };
             
-            localStorage.setItem('hot_process_data', JSON.stringify(hotData));
-            
-            // Update stats
-            updateStats();
-            
-            // Mark step as completed
-            document.querySelectorAll('.nav-step')[0].classList.add('completed');
-            
-            // Show success
-            alert(`Key handover for Tower ${tower} - Flat ${selectedFlat} saved successfully!`);
-            
-            // Move to next step
-            showStep(2);
+            try {
+                // Save to Firebase
+                await db.collection('hot_process')
+                    .doc(`${tower}_${selectedFlat}`)
+                    .set(keyHandoverData, { merge: true });
+                
+                // Save to localStorage as backup
+                saveToLocalStorage(tower, selectedFlat, keyHandoverData);
+                
+                // Update stats
+                updateStats();
+                
+                // Mark step as completed
+                document.querySelectorAll('.nav-step')[0].classList.add('completed');
+                
+                // Show success
+                showNotification(`Key handover for Tower ${tower} - Flat ${selectedFlat} saved to cloud!`, 'success');
+                
+                // Move to next step
+                showStep(2);
+                
+            } catch (error) {
+                console.error("Error saving to Firebase:", error);
+                alert("Error saving to cloud. Data saved locally only.");
+                
+                // Save to localStorage only
+                saveToLocalStorage(tower, selectedFlat, keyHandoverData);
+            }
         }
         
-        // Save snagging
-        function saveSnagging() {
+        // Save snagging to Firebase
+        async function saveSnagging() {
             const tower = document.getElementById('snagTower').value;
             const flat = document.getElementById('snagFlat').value;
             const startDate = document.getElementById('snagStart').value;
@@ -1118,45 +1164,58 @@
                 return;
             }
             
-            // Save to localStorage
-            let hotData = JSON.parse(localStorage.getItem('hot_process_data') || '{"towers":{"A":{"flats":{}},"B":{"flats":{}},"C":{"flats":{}}}}');
-            
-            const flatId = `${tower}-${flat}`;
-            if (!hotData.towers[tower].flats[flatId]) {
-                hotData.towers[tower].flats[flatId] = {};
-            }
-            
-            hotData.towers[tower].flats[flatId].snagging = {
-                startDate: startDate,
-                endDate: document.getElementById('snagEnd').value || null,
-                inspector: inspector,
-                categories: snagCategories,
-                completed: allCompleted,
-                remarks: document.getElementById('snagRemarksText').value || null,
-                followUpDate: document.getElementById('snagFollowup').value || null,
-                status: allCompleted ? 'completed' : 'pending'
+            // Prepare data for Firebase
+            const snaggingData = {
+                tower: tower,
+                flatNumber: flat,
+                snagging: {
+                    startDate: startDate,
+                    endDate: document.getElementById('snagEnd').value || null,
+                    inspector: inspector,
+                    categories: snagCategories,
+                    completed: allCompleted,
+                    remarks: document.getElementById('snagRemarksText').value || null,
+                    followUpDate: document.getElementById('snagFollowup').value || null,
+                    status: allCompleted ? 'completed' : 'pending'
+                },
+                lastUpdated: new Date().toISOString()
             };
             
-            localStorage.setItem('hot_process_data', JSON.stringify(hotData));
-            
-            // Update stats
-            updateStats();
-            
-            // Mark step as completed
-            document.querySelectorAll('.nav-step')[1].classList.add('completed');
-            
-            // Show success
-            alert(`Snagging report for Tower ${tower} - Flat ${flat} saved!`);
-            
-            // Send alert if 6th/7th day
-            checkSnaggingAlerts();
-            
-            // Move to next step
-            showStep(3);
+            try {
+                // Save to Firebase
+                await db.collection('hot_process')
+                    .doc(`${tower}_${flat}`)
+                    .set(snaggingData, { merge: true });
+                
+                // Save to localStorage as backup
+                saveToLocalStorage(tower, flat, snaggingData);
+                
+                // Update stats
+                updateStats();
+                
+                // Mark step as completed
+                document.querySelectorAll('.nav-step')[1].classList.add('completed');
+                
+                // Show success
+                showNotification(`Snagging report for Tower ${tower} - Flat ${flat} saved to cloud!`, 'success');
+                
+                // Send alert if 6th/7th day
+                checkSnaggingAlerts();
+                
+                // Move to next step
+                showStep(3);
+                
+            } catch (error) {
+                console.error("Error saving to Firebase:", error);
+                alert("Error saving to cloud. Data saved locally only.");
+                
+                // Save to localStorage only
+                saveToLocalStorage(tower, flat, snaggingData);
+            }
         }
         
-        // Save first visit
-        function saveFirstVisit() {
+        // Save first visit to Firebase
+        async function saveFirstVisit() {
             const tower = document.getElementById('visitTower').value;
             const flat = document.getElementById('visitFlat').value;
             const ownerName = document.getElementById('ownerName').value;
@@ -1170,43 +1229,56 @@
                 return;
             }
             
-            // Save to localStorage
-            let hotData = JSON.parse(localStorage.getItem('hot_process_data') || '{"towers":{"A":{"flats":{}},"B":{"flats":{}},"C":{"flats":{}}}}');
-            
-            const flatId = `${tower}-${flat}`;
-            if (!hotData.towers[tower].flats[flatId]) {
-                hotData.towers[tower].flats[flatId] = {};
-            }
-            
-            hotData.towers[tower].flats[flatId].firstVisit = {
-                ownerName: ownerName,
-                ownerPhone: ownerPhone,
-                visitDate: visitDateTime,
-                hotMember: hotMember,
-                remarks: document.getElementById('customerRemarks').value || null,
-                handoverDateSuggested: document.getElementById('visitHandoverDate').value || null,
-                crmNOC: document.getElementById('crmNOC').checked,
-                status: 'completed',
-                timestamp: new Date().toISOString()
+            // Prepare data for Firebase
+            const firstVisitData = {
+                tower: tower,
+                flatNumber: flat,
+                firstVisit: {
+                    ownerName: ownerName,
+                    ownerPhone: ownerPhone,
+                    visitDate: visitDateTime,
+                    hotMember: hotMember,
+                    remarks: document.getElementById('customerRemarks').value || null,
+                    handoverDateSuggested: document.getElementById('visitHandoverDate').value || null,
+                    crmNOC: document.getElementById('crmNOC').checked,
+                    status: 'completed',
+                    timestamp: new Date().toISOString()
+                },
+                lastUpdated: new Date().toISOString()
             };
             
-            localStorage.setItem('hot_process_data', JSON.stringify(hotData));
-            
-            // Update stats
-            updateStats();
-            
-            // Mark step as completed
-            document.querySelectorAll('.nav-step')[2].classList.add('completed');
-            
-            // Show success
-            alert(`First visit for Tower ${tower} - Flat ${flat} recorded!`);
-            
-            // Move to next step
-            showStep(4);
+            try {
+                // Save to Firebase
+                await db.collection('hot_process')
+                    .doc(`${tower}_${flat}`)
+                    .set(firstVisitData, { merge: true });
+                
+                // Save to localStorage as backup
+                saveToLocalStorage(tower, flat, firstVisitData);
+                
+                // Update stats
+                updateStats();
+                
+                // Mark step as completed
+                document.querySelectorAll('.nav-step')[2].classList.add('completed');
+                
+                // Show success
+                showNotification(`First visit for Tower ${tower} - Flat ${flat} saved to cloud!`, 'success');
+                
+                // Move to next step
+                showStep(4);
+                
+            } catch (error) {
+                console.error("Error saving to Firebase:", error);
+                alert("Error saving to cloud. Data saved locally only.");
+                
+                // Save to localStorage only
+                saveToLocalStorage(tower, flat, firstVisitData);
+            }
         }
         
-        // Save handover
-        function saveHandover() {
+        // Save handover to Firebase
+        async function saveHandover() {
             const tower = document.getElementById('hotoTower').value;
             const flat = document.getElementById('hotoFlat').value;
             const customer = document.getElementById('hotoCustomer').value;
@@ -1230,44 +1302,57 @@
                 amc: document.getElementById('docAMC').checked
             };
             
-            // Save to localStorage
-            let hotData = JSON.parse(localStorage.getItem('hot_process_data') || '{"towers":{"A":{"flats":{}},"B":{"flats":{}},"C":{"flats":{}}}}');
-            
-            const flatId = `${tower}-${flat}`;
-            if (!hotData.towers[tower].flats[flatId]) {
-                hotData.towers[tower].flats[flatId] = {};
-            }
-            
-            hotData.towers[tower].flats[flatId].handover = {
-                customer: customer,
-                secondOwner: secondOwner || null,
-                ownerEmail: ownerEmail,
-                secondOwnerEmail: secondOwnerEmail || null,
-                hotMember: hotMember,
-                date: hotoDateTime,
-                documents: documents,
-                feedback: document.getElementById('hotoFeedback').value || null,
-                status: completed ? 'completed' : 'pending',
-                timestamp: new Date().toISOString()
+            // Prepare data for Firebase
+            const handoverData = {
+                tower: tower,
+                flatNumber: flat,
+                handover: {
+                    customer: customer,
+                    secondOwner: secondOwner || null,
+                    ownerEmail: ownerEmail,
+                    secondOwnerEmail: secondOwnerEmail || null,
+                    hotMember: hotMember,
+                    date: hotoDateTime,
+                    documents: documents,
+                    feedback: document.getElementById('hotoFeedback').value || null,
+                    status: completed ? 'completed' : 'pending',
+                    timestamp: new Date().toISOString()
+                },
+                lastUpdated: new Date().toISOString()
             };
             
-            localStorage.setItem('hot_process_data', JSON.stringify(hotData));
-            
-            // Update stats
-            updateStats();
-            
-            // Mark step as completed
-            document.querySelectorAll('.nav-step')[3].classList.add('completed');
-            
-            // Show success
-            alert(`Handover for Tower ${tower} - Flat ${flat} saved!`);
-            
-            // Move to next step
-            showStep(5);
+            try {
+                // Save to Firebase
+                await db.collection('hot_process')
+                    .doc(`${tower}_${flat}`)
+                    .set(handoverData, { merge: true });
+                
+                // Save to localStorage as backup
+                saveToLocalStorage(tower, flat, handoverData);
+                
+                // Update stats
+                updateStats();
+                
+                // Mark step as completed
+                document.querySelectorAll('.nav-step')[3].classList.add('completed');
+                
+                // Show success
+                showNotification(`Handover for Tower ${tower} - Flat ${flat} saved to cloud!`, 'success');
+                
+                // Move to next step
+                showStep(5);
+                
+            } catch (error) {
+                console.error("Error saving to Firebase:", error);
+                alert("Error saving to cloud. Data saved locally only.");
+                
+                // Save to localStorage only
+                saveToLocalStorage(tower, flat, handoverData);
+            }
         }
         
-        // Save deviation
-        function saveDeviation() {
+        // Save deviation to Firebase
+        async function saveDeviation() {
             const deviationDate = document.getElementById('deviationDate').value;
             const deviationType = document.getElementById('deviationType').value;
             const deviationDetails = document.getElementById('deviationDetails').value;
@@ -1287,41 +1372,53 @@
                 return;
             }
             
-            // Save to localStorage
-            let hotData = JSON.parse(localStorage.getItem('hot_process_data') || '{"towers":{"A":{"flats":{}},"B":{"flats":{}},"C":{"flats":{}}}}');
-            
-            const flatId = `${tower}-${flat}`;
-            if (!hotData.towers[tower].flats[flatId]) {
-                hotData.towers[tower].flats[flatId] = {};
+            try {
+                // Get existing data from Firebase
+                const docRef = db.collection('hot_process').doc(`${tower}_${flat}`);
+                const doc = await docRef.get();
+                
+                let existingData = {};
+                if (doc.exists) {
+                    existingData = doc.data();
+                }
+                
+                // Initialize deviations array if it doesn't exist
+                if (!existingData.deviations) {
+                    existingData.deviations = [];
+                }
+                
+                // Add new deviation
+                existingData.deviations.push({
+                    date: deviationDate,
+                    type: deviationType,
+                    details: deviationDetails,
+                    timestamp: new Date().toISOString()
+                });
+                
+                // Save back to Firebase
+                await docRef.set(existingData, { merge: true });
+                
+                // Save to localStorage as backup
+                saveToLocalStorage(tower, flat, existingData);
+                
+                // Show success
+                showNotification(`Deviation recorded for Tower ${tower} - Flat ${flat}`, 'success');
+                
+                // Close deviation form
+                toggleDeviationForm();
+                
+                // Clear deviation form
+                document.getElementById('deviationType').value = '';
+                document.getElementById('deviationDetails').value = '';
+                
+            } catch (error) {
+                console.error("Error saving deviation:", error);
+                alert("Error saving deviation to cloud.");
             }
-            
-            if (!hotData.towers[tower].flats[flatId].deviations) {
-                hotData.towers[tower].flats[flatId].deviations = [];
-            }
-            
-            // Add deviation
-            hotData.towers[tower].flats[flatId].deviations.push({
-                date: deviationDate,
-                type: deviationType,
-                details: deviationDetails,
-                timestamp: new Date().toISOString()
-            });
-            
-            localStorage.setItem('hot_process_data', JSON.stringify(hotData));
-            
-            // Show success
-            alert(`Deviation recorded for Tower ${tower} - Flat ${flat}`);
-            
-            // Close deviation form
-            toggleDeviationForm();
-            
-            // Clear deviation form
-            document.getElementById('deviationType').value = '';
-            document.getElementById('deviationDetails').value = '';
         }
         
-        // Save interiors
-        function saveInteriors() {
+        // Save interiors to Firebase
+        async function saveInteriors() {
             const tower = document.getElementById('interiorTower').value;
             const flat = document.getElementById('interiorFlat').value;
             const startDate = document.getElementById('interiorStartDate').value;
@@ -1343,43 +1440,56 @@
                 falseCeiling: document.getElementById('intFalseCeiling').checked
             };
             
-            // Save to localStorage
-            let hotData = JSON.parse(localStorage.getItem('hot_process_data') || '{"towers":{"A":{"flats":{}},"B":{"flats":{}},"C":{"flats":{}}}}');
-            
-            const flatId = `${tower}-${flat}`;
-            if (!hotData.towers[tower].flats[flatId]) {
-                hotData.towers[tower].flats[flatId] = {};
-            }
-            
-            hotData.towers[tower].flats[flatId].interiors = {
-                startDate: startDate,
-                endDate: document.getElementById('interiorEndDate').value || null,
-                contractor: contractor,
-                contractorContact: document.getElementById('interiorContractorContact').value || null,
-                workTypes: workTypes,
-                clearanceBy: document.getElementById('interiorClearanceBy').value || null,
-                remarks: document.getElementById('interiorRemarks').value || null,
-                status: 'started',
-                timestamp: new Date().toISOString()
+            // Prepare data for Firebase
+            const interiorsData = {
+                tower: tower,
+                flatNumber: flat,
+                interiors: {
+                    startDate: startDate,
+                    endDate: document.getElementById('interiorEndDate').value || null,
+                    contractor: contractor,
+                    contractorContact: document.getElementById('interiorContractorContact').value || null,
+                    workTypes: workTypes,
+                    clearanceBy: document.getElementById('interiorClearanceBy').value || null,
+                    remarks: document.getElementById('interiorRemarks').value || null,
+                    status: 'started',
+                    timestamp: new Date().toISOString()
+                },
+                lastUpdated: new Date().toISOString()
             };
             
-            localStorage.setItem('hot_process_data', JSON.stringify(hotData));
-            
-            // Update stats
-            updateStats();
-            
-            // Mark step as completed
-            document.querySelectorAll('.nav-step')[4].classList.add('completed');
-            
-            // Show success
-            alert(`Interior work for Tower ${tower} - Flat ${flat} saved!`);
-            
-            // Move to next step
-            showStep(6);
+            try {
+                // Save to Firebase
+                await db.collection('hot_process')
+                    .doc(`${tower}_${flat}`)
+                    .set(interiorsData, { merge: true });
+                
+                // Save to localStorage as backup
+                saveToLocalStorage(tower, flat, interiorsData);
+                
+                // Update stats
+                updateStats();
+                
+                // Mark step as completed
+                document.querySelectorAll('.nav-step')[4].classList.add('completed');
+                
+                // Show success
+                showNotification(`Interior work for Tower ${tower} - Flat ${flat} saved to cloud!`, 'success');
+                
+                // Move to next step
+                showStep(6);
+                
+            } catch (error) {
+                console.error("Error saving to Firebase:", error);
+                alert("Error saving to cloud. Data saved locally only.");
+                
+                // Save to localStorage only
+                saveToLocalStorage(tower, flat, interiorsData);
+            }
         }
         
-        // Save move-in
-        function saveMovein() {
+        // Save move-in to Firebase
+        async function saveMovein() {
             const tower = document.getElementById('moveinTower').value;
             const flat = document.getElementById('moveinFlat').value;
             const customer = document.getElementById('moveinCustomer').value;
@@ -1391,36 +1501,78 @@
                 return;
             }
             
-            // Save to localStorage
-            let hotData = JSON.parse(localStorage.getItem('hot_process_data') || '{"towers":{"A":{"flats":{}},"B":{"flats":{}},"C":{"flats":{}}}}');
-            
-            const flatId = `${tower}-${flat}`;
-            if (!hotData.towers[tower].flats[flatId]) {
-                hotData.towers[tower].flats[flatId] = {};
-            }
-            
-            hotData.towers[tower].flats[flatId].movein = {
-                customer: customer,
-                date: moveinDateTime,
-                contact: document.getElementById('moveinContact').value || null,
-                remarks: document.getElementById('moveinRemarks').value || null,
-                status: 'completed',
-                timestamp: new Date().toISOString()
+            // Prepare data for Firebase
+            const moveinData = {
+                tower: tower,
+                flatNumber: flat,
+                movein: {
+                    customer: customer,
+                    date: moveinDateTime,
+                    contact: document.getElementById('moveinContact').value || null,
+                    remarks: document.getElementById('moveinRemarks').value || null,
+                    status: 'completed',
+                    timestamp: new Date().toISOString()
+                },
+                lastUpdated: new Date().toISOString()
             };
             
-            localStorage.setItem('hot_process_data', JSON.stringify(hotData));
-            
-            // Update stats
-            updateStats();
-            
-            // Mark step as completed
-            document.querySelectorAll('.nav-step')[5].classList.add('completed');
-            
-            // Show success
-            alert(`Move-in for Tower ${tower} - Flat ${flat} saved!`);
-            
-            // Process completed
-            alert(`All steps completed for Tower ${tower} - Flat ${flat}!`);
+            try {
+                // Save to Firebase
+                await db.collection('hot_process')
+                    .doc(`${tower}_${flat}`)
+                    .set(moveinData, { merge: true });
+                
+                // Save to localStorage as backup
+                saveToLocalStorage(tower, flat, moveinData);
+                
+                // Update stats
+                updateStats();
+                
+                // Mark step as completed
+                document.querySelectorAll('.nav-step')[5].classList.add('completed');
+                
+                // Show success
+                showNotification(`Move-in for Tower ${tower} - Flat ${flat} saved to cloud!`, 'success');
+                
+                // Process completed
+                showNotification(`All steps completed for Tower ${tower} - Flat ${flat}!`, 'success');
+                
+            } catch (error) {
+                console.error("Error saving to Firebase:", error);
+                alert("Error saving to cloud. Data saved locally only.");
+                
+                // Save to localStorage only
+                saveToLocalStorage(tower, flat, moveinData);
+            }
+        }
+        
+        // Save data to localStorage
+        function saveToLocalStorage(tower, flat, data) {
+            try {
+                // Load existing data
+                let hotData = JSON.parse(localStorage.getItem('hot_process_data') || '{"towers":{"A":{"flats":{}},"B":{"flats":{}},"C":{"flats":{}}}}');
+                
+                // Merge new data
+                const flatId = `${tower}-${flat}`;
+                if (!hotData.towers[tower].flats[flatId]) {
+                    hotData.towers[tower].flats[flatId] = {};
+                }
+                
+                // Merge the data
+                hotData.towers[tower].flats[flatId] = { 
+                    ...hotData.towers[tower].flats[flatId], 
+                    ...data 
+                };
+                
+                // Save back to localStorage
+                localStorage.setItem('hot_process_data', JSON.stringify(hotData));
+                
+                // Update stats
+                updateStats();
+                
+            } catch (error) {
+                console.error("Error saving to localStorage:", error);
+            }
         }
         
         // Clear step
@@ -1519,65 +1671,162 @@
         }
         
         // Update statistics
-        function updateStats() {
-            const hotData = JSON.parse(localStorage.getItem('hot_process_data') || '{"towers":{"A":{"flats":{}},"B":{"flats":{}},"C":{"flats":{}}}}');
-            
-            let totalEntries = 0;
-            ['A', 'B', 'C'].forEach(tower => {
-                totalEntries += Object.keys(hotData.towers[tower].flats).length;
-            });
-            
-            document.getElementById('localSaved').textContent = totalEntries;
-            
-            // Count today's entries
-            const today = new Date().toDateString();
-            let todayCount = 0;
-            
-            ['A', 'B', 'C'].forEach(tower => {
-                Object.values(hotData.towers[tower].flats).forEach(flatData => {
-                    if (flatData.keyHandover && new Date(flatData.keyHandover.date).toDateString() === today) {
+        async function updateStats() {
+            try {
+                // Get count from Firebase
+                const snapshot = await db.collection('hot_process').get();
+                const totalCount = snapshot.size;
+                
+                // Count today's entries
+                const today = new Date().toDateString();
+                let todayCount = 0;
+                
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    if (data.keyHandover && new Date(data.keyHandover.date).toDateString() === today) {
                         todayCount++;
                     }
                 });
-            });
-            
-            document.getElementById('todayEntries').textContent = todayCount;
-        }
-        
-        // Save all data
-        function saveAllData() {
-            // This would sync all unsaved data
-            alert('All data saved to local storage');
-            updateStats();
-        }
-        
-        // Sync data to cloud
-        function syncData() {
-            if (!navigator.onLine) {
-                alert('You are offline. Data will be synced when connection is restored.');
-                return;
+                
+                document.getElementById('todayEntries').textContent = todayCount;
+                document.getElementById('cloudSaved').textContent = totalCount;
+                
+            } catch (error) {
+                console.error("Error updating stats:", error);
+                // Fallback to localStorage
+                const localData = JSON.parse(localStorage.getItem('hot_process_data') || '{"towers":{"A":{"flats":{}},"B":{"flats":{}},"C":{"flats":{}}}}');
+                
+                let totalEntries = 0;
+                ['A', 'B', 'C'].forEach(tower => {
+                    totalEntries += Object.keys(localData.towers[tower].flats).length;
+                });
+                
+                document.getElementById('cloudSaved').textContent = totalEntries;
             }
+        }
+        
+        // Save all data to cloud
+        async function saveAllToCloud() {
+            showNotification('Syncing all data to cloud...', 'info');
             
-            // Show sync in progress
-            const syncBtn = document.querySelector('button[onclick="syncData()"]');
-            const originalHTML = syncBtn.innerHTML;
-            syncBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Syncing...';
-            syncBtn.disabled = true;
+            try {
+                // Load from localStorage
+                const localData = JSON.parse(localStorage.getItem('hot_process_data') || '{"towers":{"A":{"flats":{}},"B":{"flats":{}},"C":{"flats":{}}}}');
+                
+                // Save each flat to Firebase
+                let savedCount = 0;
+                
+                for (const tower of ['A', 'B', 'C']) {
+                    const flats = localData.towers[tower].flats;
+                    
+                    for (const [flatId, flatData] of Object.entries(flats)) {
+                        const flatNumber = flatId.split('-')[1];
+                        const firebaseData = {
+                            tower: tower,
+                            flatNumber: flatNumber,
+                            ...flatData,
+                            lastUpdated: new Date().toISOString()
+                        };
+                        
+                        await db.collection('hot_process')
+                            .doc(`${tower}_${flatNumber}`)
+                            .set(firebaseData, { merge: true });
+                        
+                        savedCount++;
+                    }
+                }
+                
+                showNotification(`${savedCount} records synced to cloud successfully!`, 'success');
+                updateStats();
+                
+            } catch (error) {
+                console.error("Error syncing to cloud:", error);
+                showNotification('Error syncing to cloud. Please check your connection.', 'error');
+            }
+        }
+        
+        // Load data from cloud
+        async function loadFromCloud() {
+            showNotification('Loading data from cloud...', 'info');
             
-            // Simulate sync
-            setTimeout(() => {
-                syncBtn.innerHTML = originalHTML;
-                syncBtn.disabled = false;
-                alert('Data synced successfully to cloud!');
-                document.getElementById('syncedCount').textContent = 
-                    document.getElementById('localSaved').textContent;
-            }, 2000);
+            try {
+                const snapshot = await db.collection('hot_process').get();
+                
+                // Convert to local data structure
+                const localData = {
+                    towers: {
+                        A: { flats: {} },
+                        B: { flats: {} },
+                        C: { flats: {} }
+                    }
+                };
+                
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    const tower = data.tower;
+                    const flatNumber = data.flatNumber;
+                    
+                    if (localData.towers[tower]) {
+                        const flatId = `${tower}-${flatNumber}`;
+                        localData.towers[tower].flats[flatId] = data;
+                    }
+                });
+                
+                // Save to localStorage
+                localStorage.setItem('hot_process_data', JSON.stringify(localData));
+                
+                showNotification(`Loaded ${snapshot.size} records from cloud!`, 'success');
+                updateStats();
+                
+            } catch (error) {
+                console.error("Error loading from cloud:", error);
+                showNotification('Error loading from cloud. Please check your connection.', 'error');
+            }
         }
         
         // Check snagging alerts
         function checkSnaggingAlerts() {
             // This would check for 6th/7th day alerts
             console.log('Checking snagging alerts...');
+        }
+        
+        // Check sync status
+        function checkSyncStatus() {
+            const statusElement = document.getElementById('syncStatus');
+            
+            if (navigator.onLine) {
+                statusElement.textContent = 'Online';
+                statusElement.className = 'text-success';
+            } else {
+                statusElement.textContent = 'Offline';
+                statusElement.className = 'text-danger';
+            }
+        }
+        
+        // Show notification
+        function showNotification(message, type) {
+            const notification = document.createElement('div');
+            notification.className = `alert alert-${type === 'success' ? 'success' : type === 'error' ? 'danger' : 'info'} alert-dismissible fade show`;
+            notification.style.position = 'fixed';
+            notification.style.top = '20px';
+            notification.style.right = '20px';
+            notification.style.zIndex = '9999';
+            notification.style.minWidth = '300px';
+            notification.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.remove();
+            }, 5000);
+        }
+        
+        // Update sync status
+        function updateSyncStatus() {
+            checkSyncStatus();
         }
     </script>
 </body>
