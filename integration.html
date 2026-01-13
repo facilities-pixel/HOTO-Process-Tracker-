@@ -6,10 +6,11 @@
     <title>Integration - HOT Process</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Firebase -->
+    <!-- Firebase Dependencies -->
     <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-analytics.js"></script>
     <!-- SheetJS for Excel export -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
@@ -197,12 +198,49 @@
         .debug-success {
             color: #198754;
         }
+        
+        .debug-warning {
+            color: #ffc107;
+        }
+        
+        .config-table {
+            font-size: 0.9rem;
+        }
+        
+        .config-table td {
+            padding: 5px 10px;
+        }
+        
+        .config-table tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        
+        .init-status {
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 0.9rem;
+        }
+        
+        .init-success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
+        .init-error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        
+        .init-warning {
+            background-color: #fff3cd;
+            color: #856404;
+        }
     </style>
 </head>
 <body>
-    <!-- Firebase Configuration -->
+    <!-- Firebase Configuration and Initialization -->
     <script>
-        // Initialize Firebase with provided config
+        // Firebase Configuration
         const firebaseConfig = {
             apiKey: "AIzaSyBZoECRF1wzKzeqyJcaW2uAszbJylpeCkU",
             authDomain: "hotoprocess.firebaseapp.com",
@@ -214,79 +252,221 @@
         };
         
         // Global Firebase variables
+        let firebaseApp = null;
         let db = null;
         let auth = null;
+        let analytics = null;
         let firebaseInitialized = false;
-        
-        // Initialize Firebase with better error handling
-        function initializeFirebase() {
-            try {
-                // Check if Firebase is already initialized
-                if (firebase.apps.length === 0) {
-                    const app = firebase.initializeApp(firebaseConfig);
-                    console.log("Firebase app initialized:", app.name);
-                } else {
-                    console.log("Firebase app already initialized");
-                }
-                
-                // Initialize services
-                db = firebase.firestore();
-                auth = firebase.auth();
-                firebaseInitialized = true;
-                
-                console.log("Firebase services initialized");
-                logDebug("Firebase initialized successfully", "success");
-                
-                // Enable offline persistence
-                db.enablePersistence()
-                    .then(() => {
-                        console.log("Firebase offline persistence enabled");
-                        logDebug("Offline persistence enabled", "success");
-                    })
-                    .catch((err) => {
-                        console.warn("Firebase offline persistence not supported:", err.code);
-                        logDebug("Offline persistence not available: " + err.code, "info");
-                    });
-                
-                // Initialize with anonymous auth
-                auth.signInAnonymously()
-                    .then(() => {
-                        console.log("Anonymous authentication successful");
-                        logDebug("Anonymous auth successful", "success");
-                        updateConnectionStatus(true);
-                        showNotification("Firebase connected successfully!", "success");
-                        
-                        // Update Firebase status in UI
-                        document.getElementById('firebaseConnectionStatus').className = 'test-status test-success';
-                        document.getElementById('firebaseConnectionStatus').textContent = 'Connected';
-                        document.getElementById('firebaseTestStatus').className = 'test-status test-success';
-                        document.getElementById('firebaseTestStatus').textContent = 'Connected';
-                    })
-                    .catch(function(error) {
-                        console.error("Auth error:", error);
-                        logDebug("Auth error: " + error.message, "error");
-                        updateConnectionStatus(false);
-                        showNotification("Firebase auth error: " + error.message, "error");
-                    });
-                    
-            } catch (error) {
-                console.error("Firebase initialization error:", error);
-                firebaseInitialized = false;
-                logDebug("Firebase init error: " + error.message, "error");
-                showNotification("Firebase initialization failed: " + error.message, "error");
-            }
-        }
+        let initializationAttempts = 0;
+        const MAX_INIT_ATTEMPTS = 3;
         
         // Debug logging
         function logDebug(message, type = "info") {
             const debugBox = document.getElementById('debugBox');
             if (debugBox) {
                 const timestamp = new Date().toLocaleTimeString();
-                const colorClass = type === "error" ? "debug-error" : (type === "success" ? "debug-success" : "debug-info");
+                let colorClass = "debug-info";
+                if (type === "error") colorClass = "debug-error";
+                else if (type === "success") colorClass = "debug-success";
+                else if (type === "warning") colorClass = "debug-warning";
+                
                 debugBox.innerHTML += `<div class="${colorClass}">[${timestamp}] ${message}</div>`;
                 debugBox.scrollTop = debugBox.scrollHeight;
             }
-            console.log(`[${type.toUpperCase()}] ${message}`);
+            console.log(`[FIREBASE ${type.toUpperCase()}] ${message}`);
+        }
+        
+        // Update Firebase status in UI
+        function updateFirebaseStatus(status, message) {
+            const statusElement = document.getElementById('firebaseInitStatus');
+            if (statusElement) {
+                statusElement.textContent = message;
+                statusElement.className = `init-${status}`;
+            }
+            
+            // Also update connection status
+            const connectionStatus = document.getElementById('firebaseConnectionStatus');
+            if (connectionStatus) {
+                if (status === 'success') {
+                    connectionStatus.className = 'test-status test-success';
+                    connectionStatus.textContent = 'Connected';
+                } else if (status === 'error') {
+                    connectionStatus.className = 'test-status test-failed';
+                    connectionStatus.textContent = 'Failed';
+                } else {
+                    connectionStatus.className = 'test-status test-pending';
+                    connectionStatus.textContent = 'Initializing...';
+                }
+            }
+        }
+        
+        // Initialize Firebase with retry logic
+        async function initializeFirebase() {
+            initializationAttempts++;
+            
+            try {
+                logDebug(`Initializing Firebase (attempt ${initializationAttempts}/${MAX_INIT_ATTEMPTS})...`, "info");
+                updateFirebaseStatus("warning", "Initializing...");
+                
+                // Check if Firebase scripts are loaded
+                if (typeof firebase === 'undefined') {
+                    throw new Error("Firebase SDK not loaded. Check internet connection.");
+                }
+                
+                logDebug(`Firebase SDK loaded: Version ${firebase.SDK_VERSION}`, "success");
+                
+                // Initialize Firebase app
+                if (firebase.apps.length === 0) {
+                    firebaseApp = firebase.initializeApp(firebaseConfig);
+                    logDebug("Firebase app initialized successfully", "success");
+                } else {
+                    firebaseApp = firebase.apps[0];
+                    logDebug("Using existing Firebase app", "info");
+                }
+                
+                // Initialize services
+                try {
+                    db = firebase.firestore();
+                    logDebug("Firestore service initialized", "success");
+                } catch (firestoreError) {
+                    logDebug(`Firestore initialization error: ${firestoreError.message}`, "error");
+                    throw new Error(`Firestore failed: ${firestoreError.message}`);
+                }
+                
+                try {
+                    auth = firebase.auth();
+                    logDebug("Authentication service initialized", "success");
+                } catch (authError) {
+                    logDebug(`Auth initialization error: ${authError.message}`, "warning");
+                }
+                
+                try {
+                    analytics = firebase.analytics();
+                    logDebug("Analytics service initialized", "success");
+                } catch (analyticsError) {
+                    logDebug(`Analytics initialization error: ${analyticsError.message}`, "warning");
+                }
+                
+                // Configure Firestore settings
+                const firestoreSettings = {
+                    cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED
+                };
+                
+                try {
+                    db.settings(firestoreSettings);
+                    logDebug("Firestore settings configured", "success");
+                } catch (settingsError) {
+                    logDebug(`Firestore settings error: ${settingsError.message}`, "warning");
+                }
+                
+                // Enable offline persistence
+                try {
+                    await db.enablePersistence();
+                    logDebug("Firestore offline persistence enabled", "success");
+                } catch (persistenceError) {
+                    logDebug(`Offline persistence not available: ${persistenceError.message}`, "warning");
+                }
+                
+                // Set up authentication
+                try {
+                    const authResult = await auth.signInAnonymously();
+                    logDebug(`Anonymous authentication successful: User ID ${authResult.user.uid}`, "success");
+                    
+                    firebaseInitialized = true;
+                    updateFirebaseStatus("success", "Connected & Authenticated");
+                    showNotification("Firebase connected successfully!", "success");
+                    
+                    // Load initial data
+                    setTimeout(() => {
+                        loadFirebaseStats();
+                        testFirebaseConnection(true);
+                    }, 1000);
+                    
+                } catch (authError) {
+                    logDebug(`Anonymous auth failed: ${authError.message} (Code: ${authError.code})`, "error");
+                    
+                    // Check if it's a permission error
+                    if (authError.code === 'auth/operation-not-allowed') {
+                        logDebug("Anonymous auth is disabled in Firebase Console", "error");
+                        logDebug("Enable it in: Authentication → Sign-in method → Anonymous → Enable", "error");
+                    }
+                    
+                    updateFirebaseStatus("error", `Auth failed: ${authError.code}`);
+                    showNotification(`Firebase auth error: ${authError.message}`, "error");
+                }
+                
+            } catch (error) {
+                logDebug(`Firebase initialization failed: ${error.message}`, "error");
+                updateFirebaseStatus("error", `Failed: ${error.message}`);
+                
+                // Retry if we haven't exceeded max attempts
+                if (initializationAttempts < MAX_INIT_ATTEMPTS) {
+                    logDebug(`Retrying in 3 seconds... (${MAX_INIT_ATTEMPTS - initializationAttempts} attempts remaining)`, "warning");
+                    setTimeout(initializeFirebase, 3000);
+                } else {
+                    showNotification("Firebase failed to initialize after multiple attempts", "error");
+                    logDebug("Max initialization attempts reached. Giving up.", "error");
+                    
+                    // Show setup instructions
+                    showFirebaseSetupInstructions();
+                }
+            }
+        }
+        
+        // Show Firebase setup instructions
+        function showFirebaseSetupInstructions() {
+            const instructions = `
+                <strong>Firebase Setup Instructions:</strong>
+                <ol>
+                    <li>Go to <a href="https://console.firebase.google.com/" target="_blank">Firebase Console</a></li>
+                    <li>Select or create project "hotoprocess"</li>
+                    <li>Enable Firestore Database:
+                        <ul>
+                            <li>Go to Firestore Database</li>
+                            <li>Click "Create Database"</li>
+                            <li>Start in test mode (for development)</li>
+                            <li>Choose location (us-central1 recommended)</li>
+                        </ul>
+                    </li>
+                    <li>Enable Anonymous Authentication:
+                        <ul>
+                            <li>Go to Authentication</li>
+                            <li>Click "Sign-in method" tab</li>
+                            <li>Enable "Anonymous" provider</li>
+                        </ul>
+                    </li>
+                    <li>Check your Firebase Config matches:
+                        <ul>
+                            <li>Project ID: hotoprocess</li>
+                            <li>App ID: 1:958524591846:web:b51c86974c212d01fe7527</li>
+                        </ul>
+                    </li>
+                </ol>
+            `;
+            
+            // Create modal or show in debug box
+            logDebug("SETUP REQUIRED: " + instructions.replace(/<[^>]*>/g, ''), "error");
+            
+            // Show alert with instructions
+            setTimeout(() => {
+                if (confirm("Firebase setup required. Click OK to see setup instructions in console.")) {
+                    console.log("%c=== FIREBASE SETUP INSTRUCTIONS ===", "color: blue; font-size: 16px; font-weight: bold;");
+                    console.log("1. Go to: https://console.firebase.google.com/");
+                    console.log("2. Select project: hotoprocess");
+                    console.log("3. Enable Firestore Database:");
+                    console.log("   - Click 'Firestore Database' in left menu");
+                    console.log("   - Click 'Create Database'");
+                    console.log("   - Start in 'test mode' for development");
+                    console.log("   - Choose location (us-central1 recommended)");
+                    console.log("4. Enable Anonymous Authentication:");
+                    console.log("   - Click 'Authentication' in left menu");
+                    console.log("   - Go to 'Sign-in method' tab");
+                    console.log("   - Enable 'Anonymous' provider");
+                    console.log("5. Verify your app configuration matches:");
+                    console.log("   - Project ID: hotoprocess");
+                    console.log("   - App ID: 1:958524591846:web:b51c86974c212d01fe7527");
+                }
+            }, 1000);
         }
         
         // Monitor online/offline status
@@ -294,6 +474,11 @@
             updateConnectionStatus(true);
             showNotification("You're back online!", "success");
             logDebug("Browser online", "success");
+            
+            // Try to reinitialize Firebase if not connected
+            if (!firebaseInitialized) {
+                setTimeout(initializeFirebase, 1000);
+            }
         });
         
         window.addEventListener('offline', () => {
@@ -304,20 +489,29 @@
         
         function updateConnectionStatus(isOnline) {
             const overallStatus = document.getElementById('overallStatus');
-            if (isOnline) {
-                overallStatus.className = 'integration-status status-connected';
-                overallStatus.innerHTML = '<span class="connection-indicator connection-online"></span> Online';
-            } else {
-                overallStatus.className = 'integration-status status-disconnected';
-                overallStatus.innerHTML = '<span class="connection-indicator connection-offline"></span> Offline';
+            if (overallStatus) {
+                if (isOnline) {
+                    overallStatus.className = 'integration-status status-connected';
+                    overallStatus.innerHTML = '<span class="connection-indicator connection-online"></span> Online';
+                } else {
+                    overallStatus.className = 'integration-status status-disconnected';
+                    overallStatus.innerHTML = '<span class="connection-indicator connection-offline"></span> Offline';
+                }
             }
         }
         
-        // Initialize on page load
+        // Initialize when page loads
         document.addEventListener('DOMContentLoaded', function() {
-            console.log("Page loaded, initializing Firebase...");
-            logDebug("Page loaded, initializing Firebase...", "info");
-            initializeFirebase();
+            logDebug("Page loaded, starting Firebase initialization...", "info");
+            
+            // Start Firebase initialization after a short delay
+            setTimeout(initializeFirebase, 500);
+            
+            // Load other configurations
+            loadConfiguration();
+            loadSyncLogs();
+            updateSyncStats();
+            loadBackupList();
         });
     </script>
     
@@ -403,6 +597,9 @@
                         <button class="btn btn-sm btn-outline-secondary w-100" onclick="clearDebugLogs()">
                             <i class="fas fa-broom"></i> Clear Debug Logs
                         </button>
+                        <button class="btn btn-sm btn-outline-danger w-100 mt-2" onclick="showFirebaseSetupInstructions()">
+                            <i class="fas fa-question-circle"></i> Show Setup Help
+                        </button>
                     </div>
                 </div>
             </div>
@@ -431,15 +628,9 @@
                         </div>
                     </div>
                     <div class="card-body">
-                        <div class="alert alert-info">
-                            <i class="fas fa-info-circle me-2"></i>
-                            <strong>Firebase Troubleshooting:</strong> If connection fails, check:
-                            <ol class="mb-0 mt-2">
-                                <li>Firebase Firestore is enabled in your Firebase Console</li>
-                                <li>Security rules allow anonymous access (if using anonymous auth)</li>
-                                <li>Your Firebase project exists and is properly configured</li>
-                                <li>Check browser console (F12) for detailed error messages</li>
-                            </ol>
+                        <div class="alert alert-warning" id="firebaseAlert">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <strong>Firebase Status:</strong> <span id="firebaseAlertText">Initializing...</span>
                         </div>
                         
                         <div class="debug-box" id="debugBox">
@@ -467,7 +658,7 @@
                             <i class="fas fa-database"></i>
                         </div>
                         <div>
-                            <h5 class="mb-1">Firebase Database (Active)</h5>
+                            <h5 class="mb-1">Firebase Database</h5>
                             <p class="text-muted mb-0">Real-time cross-device data sync</p>
                         </div>
                     </div>
@@ -475,25 +666,29 @@
                         <div class="row">
                             <div class="col-md-8">
                                 <div class="mb-3">
-                                    <label class="form-label">Firebase Project Configuration</label>
+                                    <label class="form-label">Firebase Configuration</label>
                                     <div class="table-responsive">
-                                        <table class="table table-sm table-bordered">
+                                        <table class="table table-sm table-bordered config-table">
                                             <tbody>
                                                 <tr>
                                                     <td><strong>Project ID</strong></td>
                                                     <td>hotoprocess</td>
                                                 </tr>
                                                 <tr>
-                                                    <td><strong>Auth Domain</strong></td>
-                                                    <td>hotoprocess.firebaseapp.com</td>
+                                                    <td><strong>Status</strong></td>
+                                                    <td><span class="init-status" id="firebaseInitStatus">Not Initialized</span></td>
                                                 </tr>
                                                 <tr>
-                                                    <td><strong>Database URL</strong></td>
-                                                    <td>https://hotoprocess.firebaseio.com</td>
+                                                    <td><strong>SDK Version</strong></td>
+                                                    <td id="firebaseSdkVersion">Loading...</td>
                                                 </tr>
                                                 <tr>
-                                                    <td><strong>Storage Bucket</strong></td>
-                                                    <td>hotoprocess.firebasestorage.app</td>
+                                                    <td><strong>Firestore Status</strong></td>
+                                                    <td id="firestoreStatus">Not connected</td>
+                                                </tr>
+                                                <tr>
+                                                    <td><strong>Auth Status</strong></td>
+                                                    <td id="authStatus">Not authenticated</td>
                                                 </tr>
                                             </tbody>
                                         </table>
@@ -504,13 +699,13 @@
                                     <div class="col-md-6">
                                         <div class="mb-3">
                                             <label class="form-label">Total Records</label>
-                                            <input type="text" class="form-control" id="firebaseRecordCount" value="Loading..." readonly>
+                                            <input type="text" class="form-control" id="firebaseRecordCount" value="Not connected" readonly>
                                         </div>
                                     </div>
                                     <div class="col-md-6">
                                         <div class="mb-3">
                                             <label class="form-label">Last Sync</label>
-                                            <input type="text" class="form-control" id="firebaseLastSync" value="Loading..." readonly>
+                                            <input type="text" class="form-control" id="firebaseLastSync" value="Not connected" readonly>
                                         </div>
                                     </div>
                                 </div>
@@ -593,13 +788,13 @@
                                 </div>
                                 
                                 <div class="mt-2">
-                                    <small class="text-muted d-block">Data Security:</small>
-                                    <span>Anonymous Auth</span>
+                                    <small class="text-muted d-block">Authentication:</small>
+                                    <span id="authMethod">Anonymous</span>
                                 </div>
                                 
                                 <div class="mt-2">
-                                    <small class="text-muted d-block">Firebase Status:</small>
-                                    <span id="firebaseInitStatus">Not Initialized</span>
+                                    <small class="text-muted d-block">User ID:</small>
+                                    <span id="firebaseUserId">Not logged in</span>
                                 </div>
                             </div>
                         </div>
@@ -951,14 +1146,13 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         // Integration Manager JavaScript
-        let syncInterval = null;
         
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
-            loadConfiguration();
-            loadSyncLogs();
-            updateSyncStats();
-            loadBackupList();
+            // Set Firebase SDK version if available
+            if (typeof firebase !== 'undefined') {
+                document.getElementById('firebaseSdkVersion').textContent = firebase.SDK_VERSION;
+            }
             
             // Setup auto-refresh for Firebase stats if connected
             setInterval(() => {
@@ -970,69 +1164,116 @@
         
         // Reinitialize Firebase
         function reinitializeFirebase() {
-            logDebug("Reinitializing Firebase...", "info");
+            logDebug("Manually reinitializing Firebase...", "info");
+            initializationAttempts = 0;
+            firebaseInitialized = false;
             initializeFirebase();
         }
         
         // Clear debug logs
         function clearDebugLogs() {
-            document.getElementById('debugBox').innerHTML = '';
+            const debugBox = document.getElementById('debugBox');
+            if (debugBox) {
+                debugBox.innerHTML = '';
+            }
             logDebug("Debug logs cleared", "info");
         }
         
         // Check Firebase setup
         async function checkFirebaseSetup() {
-            logDebug("Checking Firebase setup...", "info");
+            logDebug("=== Firebase Setup Check ===", "info");
             
-            try {
-                // Test if Firebase is loaded
-                if (typeof firebase === 'undefined') {
-                    logDebug("Firebase SDK not loaded", "error");
-                    showNotification("Firebase SDK not loaded. Check CDN connection.", "error");
-                    return;
-                }
-                
-                logDebug("Firebase SDK loaded: " + firebase.SDK_VERSION, "success");
-                
-                // Check Firebase config
-                logDebug("Checking Firebase configuration...", "info");
-                logDebug("Project ID: " + firebaseConfig.projectId, "info");
-                logDebug("API Key: " + firebaseConfig.apiKey.substring(0, 10) + "...", "info");
-                
-                // Test Firestore access
-                await testFirestoreAccess();
-                
-            } catch (error) {
-                logDebug("Setup check error: " + error.message, "error");
+            // Check Firebase SDK
+            if (typeof firebase === 'undefined') {
+                logDebug("❌ Firebase SDK not loaded", "error");
+                logDebug("Check that Firebase CDN URLs are accessible:", "error");
+                logDebug("https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js", "error");
+                return;
             }
+            
+            logDebug("✓ Firebase SDK loaded: Version " + firebase.SDK_VERSION, "success");
+            
+            // Check Firebase app
+            if (!firebaseApp) {
+                logDebug("❌ Firebase app not initialized", "error");
+                return;
+            }
+            
+            logDebug("✓ Firebase app initialized: " + firebaseApp.name, "success");
+            
+            // Check Firestore
+            if (!db) {
+                logDebug("❌ Firestore service not available", "error");
+                logDebug("Make sure firebase-firestore.js is included", "error");
+                return;
+            }
+            
+            logDebug("✓ Firestore service available", "success");
+            
+            // Check Authentication
+            if (!auth) {
+                logDebug("⚠ Authentication service not available", "warning");
+            } else {
+                logDebug("✓ Authentication service available", "success");
+            }
+            
+            // Test Firestore connection
+            await testFirestoreAccess();
         }
         
         // Test Firebase authentication
         async function testFirebaseAuth() {
             logDebug("Testing Firebase authentication...", "info");
             
+            if (!auth) {
+                logDebug("❌ Authentication service not initialized", "error");
+                showNotification("Auth service not available", "error");
+                return;
+            }
+            
             try {
-                if (!auth) {
-                    logDebug("Auth service not initialized", "error");
-                    return;
-                }
-                
                 // Get current user
                 const currentUser = auth.currentUser;
+                
                 if (currentUser) {
-                    logDebug("Current user: " + currentUser.uid + " (anonymous: " + currentUser.isAnonymous + ")", "success");
+                    logDebug(`✓ User authenticated: ${currentUser.uid}`, "success");
+                    logDebug(`  - Anonymous: ${currentUser.isAnonymous}`, "info");
+                    logDebug(`  - Email: ${currentUser.email || 'No email'}`, "info");
+                    
+                    // Update UI
+                    document.getElementById('authStatus').textContent = 'Authenticated';
+                    document.getElementById('authStatus').className = 'text-success';
+                    document.getElementById('firebaseUserId').textContent = currentUser.uid.substring(0, 8) + '...';
+                    
+                    showNotification("Authentication successful!", "success");
                 } else {
                     logDebug("No user logged in, attempting anonymous auth...", "info");
                     
                     // Try anonymous auth
                     const result = await auth.signInAnonymously();
-                    logDebug("Anonymous auth successful: " + result.user.uid, "success");
-                    showNotification("Firebase authentication successful!", "success");
+                    logDebug(`✓ Anonymous auth successful: ${result.user.uid}`, "success");
+                    
+                    document.getElementById('authStatus').textContent = 'Authenticated (Anonymous)';
+                    document.getElementById('authStatus').className = 'text-success';
+                    document.getElementById('firebaseUserId').textContent = result.user.uid.substring(0, 8) + '...';
+                    
+                    showNotification("Anonymous authentication successful!", "success");
                 }
                 
             } catch (error) {
-                logDebug("Auth test error: " + error.message + " (code: " + error.code + ")", "error");
-                showNotification("Firebase auth error: " + error.message, "error");
+                logDebug(`❌ Auth error: ${error.message} (code: ${error.code})`, "error");
+                
+                // Update UI
+                document.getElementById('authStatus').textContent = `Error: ${error.code}`;
+                document.getElementById('authStatus').className = 'text-danger';
+                
+                showNotification(`Auth error: ${error.message}`, "error");
+                
+                // Provide guidance based on error code
+                if (error.code === 'auth/operation-not-allowed') {
+                    logDebug("Anonymous auth is disabled. Enable it in Firebase Console:", "error");
+                    logDebug("Authentication → Sign-in method → Anonymous → Enable", "error");
+                }
             }
         }
         
@@ -1040,62 +1281,93 @@
         async function testFirestoreAccess() {
             logDebug("Testing Firestore access...", "info");
             
+            if (!db) {
+                logDebug("❌ Firestore service not initialized", "error");
+                document.getElementById('firestoreStatus').textContent = 'Not initialized';
+                document.getElementById('firestoreStatus').className = 'text-danger';
+                showNotification("Firestore not available", "error");
+                return;
+            }
+            
             try {
-                if (!db) {
-                    logDebug("Firestore service not initialized", "error");
-                    return;
-                }
-                
                 // Try to access a test document
-                const testDocRef = db.collection('test_collection').doc('test_document');
+                const testDocRef = db.collection('_test_connection').doc('test');
+                
+                logDebug("Attempting to write test document...", "info");
                 
                 // Try to set a test document
                 await testDocRef.set({
                     test: true,
-                    timestamp: new Date().toISOString()
+                    timestamp: new Date().toISOString(),
+                    message: "Firestore connection test"
                 });
                 
-                logDebug("Firestore write successful", "success");
+                logDebug("✓ Firestore write successful", "success");
                 
                 // Try to read it back
+                logDebug("Attempting to read test document...", "info");
                 const doc = await testDocRef.get();
+                
                 if (doc.exists) {
-                    logDebug("Firestore read successful", "success");
+                    logDebug("✓ Firestore read successful", "success");
+                    logDebug(`  Document data: ${JSON.stringify(doc.data())}`, "info");
                 }
                 
                 // Clean up test document
+                logDebug("Cleaning up test document...", "info");
                 await testDocRef.delete();
-                logDebug("Test document cleaned up", "info");
+                logDebug("✓ Test document cleaned up", "success");
+                
+                // Update UI
+                document.getElementById('firestoreStatus').textContent = 'Connected';
+                document.getElementById('firestoreStatus').className = 'text-success';
                 
                 showNotification("Firestore access successful!", "success");
                 
+                // Also update the main connection status
+                document.getElementById('firebaseTestStatus').className = 'test-status test-success';
+                document.getElementById('firebaseTestStatus').textContent = 'Connected';
+                
+                return true;
+                
             } catch (error) {
-                logDebug("Firestore access error: " + error.message + " (code: " + error.code + ")", "error");
+                logDebug(`❌ Firestore error: ${error.message} (code: ${error.code})`, "error");
+                
+                // Update UI
+                document.getElementById('firestoreStatus').textContent = `Error: ${error.code}`;
+                document.getElementById('firestoreStatus').className = 'text-danger';
                 
                 // Provide specific guidance based on error code
                 if (error.code === 'permission-denied') {
-                    logDebug("Permission denied. Check Firestore security rules:", "error");
-                    logDebug("Enable anonymous auth in Firestore rules:", "error");
+                    logDebug("Permission denied. Firestore security rules are blocking access.", "error");
+                    logDebug("Go to Firebase Console → Firestore Database → Rules tab", "error");
+                    logDebug("Update rules to allow access. For development, use:", "error");
                     logDebug("rules_version = '2';", "info");
                     logDebug("service cloud.firestore {", "info");
                     logDebug("  match /databases/{database}/documents {", "info");
                     logDebug("    match /{document=**} {", "info");
-                    logDebug("      allow read, write: if request.auth != null;", "info");
+                    logDebug("      allow read, write: if true;", "info");
                     logDebug("    }", "info");
                     logDebug("  }", "info");
                     logDebug("}", "info");
+                    logDebug("Warning: This allows anyone to read/write. Use only for development!", "warning");
                 } else if (error.code === 'failed-precondition') {
-                    logDebug("Firestore database not created. Go to Firebase Console > Firestore > Create Database", "error");
+                    logDebug("Firestore database not created.", "error");
+                    logDebug("Go to Firebase Console → Firestore Database → Create Database", "error");
+                } else if (error.code === 'unavailable') {
+                    logDebug("Firestore service unavailable. Check internet connection.", "error");
                 }
                 
-                showNotification("Firestore access error: " + error.message, "error");
+                showNotification(`Firestore error: ${error.message}`, "error");
+                return false;
             }
         }
         
         // Load Firebase statistics
         async function loadFirebaseStats() {
-            if (!db) {
-                document.getElementById('firebaseRecordCount').value = "Firebase not initialized";
+            if (!db || !firebaseInitialized) {
+                document.getElementById('firebaseRecordCount').value = "Not connected";
+                document.getElementById('firebaseLastSync').value = "Not connected";
                 return;
             }
             
@@ -1122,78 +1394,109 @@
                 document.getElementById('firebaseSnagCount').textContent = snagCount;
                 document.getElementById('firebaseHandoverCount').textContent = handoverCount;
                 
-                logDebug("Firebase stats loaded: " + count + " records", "success");
+                logDebug(`Firebase stats loaded: ${count} records`, "success");
                 
             } catch (error) {
                 console.error("Error loading Firebase stats:", error);
-                document.getElementById('firebaseRecordCount').value = "Error: " + error.code;
-                logDebug("Error loading stats: " + error.message, "error");
+                document.getElementById('firebaseRecordCount').value = `Error: ${error.code || 'Unknown'}`;
+                logDebug(`Error loading stats: ${error.message}`, "error");
             }
         }
         
         // Test Firebase connection
-        async function testFirebaseConnection() {
+        async function testFirebaseConnection(silent = false) {
             const statusElement = document.getElementById('firebaseConnectionStatus');
             const btn = document.getElementById('testFirebaseBtn');
             const progressBar = document.getElementById('firebaseSyncProgress');
-            const originalHTML = btn.innerHTML;
+            const originalHTML = btn ? btn.innerHTML : '';
             
-            statusElement.className = 'test-status test-pending';
-            statusElement.textContent = 'Testing...';
-            btn.innerHTML = '<span class="loading-spinner"></span> Testing...';
-            btn.disabled = true;
-            progressBar.style.width = '30%';
-            progressBar.className = 'progress-bar bg-warning';
+            if (statusElement) {
+                statusElement.className = 'test-status test-pending';
+                statusElement.textContent = 'Testing...';
+            }
+            
+            if (btn) {
+                btn.innerHTML = '<span class="loading-spinner"></span> Testing...';
+                btn.disabled = true;
+            }
+            
+            if (progressBar) {
+                progressBar.style.width = '30%';
+                progressBar.className = 'progress-bar bg-warning';
+            }
+            
+            if (!silent) {
+                logDebug("Testing Firebase connection...", "info");
+            }
             
             try {
                 // Check if Firebase is initialized
                 if (!firebaseInitialized || !db) {
-                    throw new Error("Firebase not initialized");
+                    throw new Error("Firebase not initialized. Click 'Reinitialize Firebase' to try again.");
                 }
                 
-                // Test Firestore connection
-                await db.collection('hot_process').limit(1).get();
+                // Test Firestore connection by getting collection count
+                const snapshot = await db.collection('hot_process').limit(1).get();
                 
-                statusElement.className = 'test-status test-success';
-                statusElement.textContent = 'Connected';
-                progressBar.style.width = '100%';
-                progressBar.className = 'progress-bar bg-success';
+                if (statusElement) {
+                    statusElement.className = 'test-status test-success';
+                    statusElement.textContent = 'Connected';
+                }
                 
-                document.getElementById('firebaseTestStatus').className = 'test-status test-success';
-                document.getElementById('firebaseTestStatus').textContent = 'Connected';
-                document.getElementById('firebaseInitStatus').textContent = 'Connected';
-                document.getElementById('firebaseInitStatus').className = 'text-success';
+                if (progressBar) {
+                    progressBar.style.width = '100%';
+                    progressBar.className = 'progress-bar bg-success';
+                }
                 
-                logSync('Firebase connection test successful', 'success');
-                showNotification('✓ Firebase connection successful!', 'success');
+                if (document.getElementById('firebaseTestStatus')) {
+                    document.getElementById('firebaseTestStatus').className = 'test-status test-success';
+                    document.getElementById('firebaseTestStatus').textContent = 'Connected';
+                }
+                
+                if (!silent) {
+                    logSync('Firebase connection test successful', 'success');
+                    showNotification('✓ Firebase connection successful!', 'success');
+                    logDebug("Firebase connection test passed", "success");
+                }
+                
                 updateConnectionStatus(true);
-                logDebug("Firebase connection test passed", "success");
                 
             } catch (error) {
-                statusElement.className = 'test-status test-failed';
-                statusElement.textContent = 'Connection Failed';
-                progressBar.style.width = '100%';
-                progressBar.className = 'progress-bar bg-danger';
+                if (statusElement) {
+                    statusElement.className = 'test-status test-failed';
+                    statusElement.textContent = 'Connection Failed';
+                }
                 
-                document.getElementById('firebaseTestStatus').className = 'test-status test-failed';
-                document.getElementById('firebaseTestStatus').textContent = 'Failed';
-                document.getElementById('firebaseInitStatus').textContent = 'Failed: ' + error.message;
-                document.getElementById('firebaseInitStatus').className = 'text-danger';
+                if (progressBar) {
+                    progressBar.style.width = '100%';
+                    progressBar.className = 'progress-bar bg-danger';
+                }
                 
-                logSync('Firebase connection test failed: ' + error.message, 'error');
-                showNotification('✗ Firebase connection failed: ' + error.message, 'error');
-                logDebug("Firebase connection test failed: " + error.message, "error");
+                if (document.getElementById('firebaseTestStatus')) {
+                    document.getElementById('firebaseTestStatus').className = 'test-status test-failed';
+                    document.getElementById('firebaseTestStatus').textContent = 'Failed';
+                }
+                
+                if (!silent) {
+                    logSync('Firebase connection test failed: ' + error.message, 'error');
+                    showNotification('✗ Firebase connection failed: ' + error.message, 'error');
+                    logDebug("Firebase connection test failed: " + error.message, "error");
+                }
                 
             } finally {
-                btn.innerHTML = originalHTML;
-                btn.disabled = false;
+                if (btn) {
+                    btn.innerHTML = originalHTML;
+                    btn.disabled = false;
+                }
                 
                 // Reset progress bar after 2 seconds
-                setTimeout(() => {
-                    if (progressBar.style.width === '100%') {
-                        progressBar.style.width = '0%';
-                    }
-                }, 2000);
+                if (progressBar) {
+                    setTimeout(() => {
+                        if (progressBar.style.width === '100%') {
+                            progressBar.style.width = '0%';
+                        }
+                    }, 2000);
+                }
             }
         }
         
@@ -1209,8 +1512,8 @@
             logDebug("Starting Firebase to Local sync", "info");
             
             try {
-                if (!db) {
-                    throw new Error("Firebase not initialized");
+                if (!db || !firebaseInitialized) {
+                    throw new Error("Firebase not connected. Check connection first.");
                 }
                 
                 const snapshot = await db.collection('hot_process').get();
@@ -1224,7 +1527,8 @@
                     },
                     metadata: {
                         lastSync: new Date().toISOString(),
-                        recordCount: snapshot.size
+                        recordCount: snapshot.size,
+                        source: 'firebase'
                     }
                 };
                 
@@ -1244,7 +1548,7 @@
                 
                 showNotification(`Downloaded ${snapshot.size} records from Firebase!`, 'success');
                 logSync(`Downloaded ${snapshot.size} records from Firebase`, 'success');
-                logDebug("Firebase to Local sync completed: " + snapshot.size + " records", "success");
+                logDebug(`Firebase to Local sync completed: ${snapshot.size} records`, "success");
                 
             } catch (error) {
                 console.error("Error syncing from Firebase:", error);
@@ -1270,8 +1574,8 @@
             logDebug("Starting Local to Firebase sync", "info");
             
             try {
-                if (!db) {
-                    throw new Error("Firebase not initialized");
+                if (!db || !firebaseInitialized) {
+                    throw new Error("Firebase not connected. Check connection first.");
                 }
                 
                 // Load from localStorage
@@ -1291,7 +1595,8 @@
                                 tower: tower,
                                 flatNumber: flatNumber,
                                 ...flatData,
-                                lastUpdated: new Date().toISOString()
+                                lastUpdated: new Date().toISOString(),
+                                source: 'local_upload'
                             };
                             
                             await db.collection('hot_process')
@@ -1302,7 +1607,7 @@
                             
                         } catch (error) {
                             errors.push(`Flat ${flatId}: ${error.message}`);
-                            logDebug("Upload error for " + flatId + ": " + error.message, "error");
+                            logDebug(`Upload error for ${flatId}: ${error.message}`, "error");
                         }
                     }
                 }
@@ -1315,7 +1620,7 @@
                 }
                 
                 logSync(`Uploaded ${uploadedCount} records to Firebase`, errors.length > 0 ? 'warning' : 'success');
-                logDebug("Local to Firebase sync completed: " + uploadedCount + " records uploaded", errors.length > 0 ? "warning" : "success");
+                logDebug(`Local to Firebase sync completed: ${uploadedCount} records uploaded`, errors.length > 0 ? "warning" : "success");
                 
                 // Refresh stats
                 loadFirebaseStats();
@@ -1341,8 +1646,8 @@
             btn.disabled = true;
             
             try {
-                if (!db) {
-                    throw new Error("Firebase not initialized");
+                if (!db || !firebaseInitialized) {
+                    throw new Error("Firebase not connected. Check connection first.");
                 }
                 
                 const snapshot = await db.collection('hot_process').get();
@@ -1350,7 +1655,10 @@
                 // Convert to array
                 const data = [];
                 snapshot.forEach(doc => {
-                    data.push(doc.data());
+                    data.push({
+                        id: doc.id,
+                        ...doc.data()
+                    });
                 });
                 
                 // Convert to JSON
@@ -1368,7 +1676,7 @@
                 
                 showNotification(`Exported ${data.length} records from Firebase`, 'success');
                 logSync('Firebase data exported', 'success');
-                logDebug("Firebase data exported: " + data.length + " records", "success");
+                logDebug(`Firebase data exported: ${data.length} records`, "success");
                 
             } catch (error) {
                 console.error("Error exporting Firebase data:", error);
