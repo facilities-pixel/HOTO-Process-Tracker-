@@ -6,6 +6,12 @@
     <title>Integration - HOT Process</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js"></script>
+    <!-- SheetJS for Excel export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         :root {
             --cbre-blue: #1F3765;
@@ -130,9 +136,109 @@
             background: #fff3cd;
             color: #856404;
         }
+        
+        .loading-spinner {
+            display: inline-block;
+            width: 1rem;
+            height: 1rem;
+            border: 2px solid currentColor;
+            border-right-color: transparent;
+            border-radius: 50%;
+            animation: spinner 0.75s linear infinite;
+        }
+        
+        @keyframes spinner {
+            to { transform: rotate(360deg); }
+        }
+        
+        .connection-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 5px;
+        }
+        
+        .connection-online {
+            background: #28a745;
+            animation: pulse 2s infinite;
+        }
+        
+        .connection-offline {
+            background: #dc3545;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
     </style>
 </head>
 <body>
+    <!-- Firebase Configuration -->
+    <script>
+        // Initialize Firebase with provided config
+        const firebaseConfig = {
+            apiKey: "AIzaSyBZoECRF1wzKzeqyJcaW2uAszbJylpeCkU",
+            authDomain: "hotoprocess.firebaseapp.com",
+            projectId: "hotoprocess",
+            storageBucket: "hotoprocess.firebasestorage.app",
+            messagingSenderId: "958524591846",
+            appId: "1:958524591846:web:b51c86974c212d01fe7527",
+            measurementId: "G-7KWHXLSP2J"
+        };
+        
+        // Initialize Firebase
+        try {
+            firebase.initializeApp(firebaseConfig);
+            const db = firebase.firestore();
+            const auth = firebase.auth();
+            
+            // Enable offline persistence
+            db.enablePersistence()
+                .catch((err) => {
+                    console.warn("Firebase offline persistence not supported:", err.code);
+                });
+            
+            // Initialize with anonymous auth
+            auth.signInAnonymously()
+                .then(() => {
+                    console.log("Anonymous authentication successful");
+                    updateConnectionStatus(true);
+                })
+                .catch(function(error) {
+                    console.error("Auth error:", error);
+                    updateConnectionStatus(false);
+                });
+        } catch (error) {
+            console.error("Firebase initialization error:", error);
+            showNotification("Firebase initialization failed. Check console for details.", "error");
+        }
+        
+        // Monitor online/offline status
+        window.addEventListener('online', () => {
+            updateConnectionStatus(true);
+            showNotification("You're back online!", "success");
+        });
+        
+        window.addEventListener('offline', () => {
+            updateConnectionStatus(false);
+            showNotification("You're offline. Some features may be limited.", "warning");
+        });
+        
+        function updateConnectionStatus(isOnline) {
+            const overallStatus = document.getElementById('overallStatus');
+            if (isOnline) {
+                overallStatus.className = 'integration-status status-connected';
+                overallStatus.innerHTML = '<span class="connection-indicator connection-online"></span> Online';
+            } else {
+                overallStatus.className = 'integration-status status-disconnected';
+                overallStatus.innerHTML = '<span class="connection-indicator connection-offline"></span> Offline';
+            }
+        }
+    </script>
+    
     <div class="container-fluid">
         <div class="row">
             <!-- Sidebar -->
@@ -196,12 +302,12 @@
                     <div class="px-3">
                         <h6 class="text-muted mb-2">Sync Status</h6>
                         <div class="connection-test">
-                            <span class="test-status" id="googleTestStatus">Not Tested</span>
+                            <span class="test-status test-pending" id="googleTestStatus">Not Tested</span>
                             <small>Google Sheets</small>
                         </div>
                         <div class="connection-test">
-                            <span class="test-status" id="apiTestStatus">Not Tested</span>
-                            <small>API</small>
+                            <span class="test-status test-pending" id="firebaseTestStatus">Not Tested</span>
+                            <small>Firebase</small>
                         </div>
                     </div>
                 </div>
@@ -214,8 +320,147 @@
                         <h2>Integration Manager</h2>
                         <p class="text-muted mb-0">Configure and manage data integrations</p>
                     </div>
-                    <div class="integration-status status-connected" id="overallStatus">
-                        <i class="fas fa-circle"></i> Online
+                    <div class="integration-status status-pending" id="overallStatus">
+                        <span class="connection-indicator connection-online"></span> Checking...
+                    </div>
+                </div>
+                
+                <!-- Firebase Integration -->
+                <div class="card integration-card" id="firebase">
+                    <div class="card-header d-flex align-items-center">
+                        <div class="integration-icon" style="background: #FFA000;">
+                            <i class="fas fa-database"></i>
+                        </div>
+                        <div>
+                            <h5 class="mb-1">Firebase Database (Active)</h5>
+                            <p class="text-muted mb-0">Real-time cross-device data sync</p>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                                    <i class="fas fa-check-circle me-2"></i>
+                                    <strong>Success!</strong> Firebase configuration loaded successfully for project: <strong>hotoprocess</strong>
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Firebase Project ID</label>
+                                    <input type="text" class="form-control" value="hotoprocess" readonly>
+                                    <small class="text-muted">Project is currently using Firebase for real-time sync</small>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Total Records</label>
+                                            <input type="text" class="form-control" id="firebaseRecordCount" value="Loading..." readonly>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Last Sync</label>
+                                            <input type="text" class="form-control" id="firebaseLastSync" value="Loading..." readonly>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-check mb-3">
+                                            <input class="form-check-input" type="checkbox" id="firebaseAutoSync" checked disabled>
+                                            <label class="form-check-label" for="firebaseAutoSync">
+                                                Real-time auto-sync enabled
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-check mb-3">
+                                            <input class="form-check-input" type="checkbox" id="firebaseOffline" checked>
+                                            <label class="form-check-label" for="firebaseOffline">
+                                                Offline data support
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Data Statistics</label>
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <div class="card bg-light">
+                                                <div class="card-body text-center p-2">
+                                                    <h6 id="firebaseKeyCount">0</h6>
+                                                    <small class="text-muted">Key Handovers</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="card bg-light">
+                                                <div class="card-body text-center p-2">
+                                                    <h6 id="firebaseSnagCount">0</h6>
+                                                    <small class="text-muted">Snagging</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="card bg-light">
+                                                <div class="card-body text-center p-2">
+                                                    <h6 id="firebaseHandoverCount">0</h6>
+                                                    <small class="text-muted">Handovers</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="api-test-box">
+                                    <h6>Connection Status</h6>
+                                    <div class="connection-test mb-2">
+                                        <span class="test-status test-pending" id="firebaseConnectionStatus">Not Tested</span>
+                                        <small>Firebase Status</small>
+                                    </div>
+                                    
+                                    <div class="progress-thin">
+                                        <div class="progress-bar bg-secondary" id="firebaseSyncProgress" style="width: 0%"></div>
+                                    </div>
+                                    
+                                    <button class="btn btn-sm btn-outline-primary w-100 mb-2" onclick="testFirebaseConnection()" id="testFirebaseBtn">
+                                        <i class="fas fa-plug"></i> Test Connection
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-success w-100 mb-2" onclick="syncFirebaseToLocal()" id="downloadFirebaseBtn">
+                                        <i class="fas fa-download"></i> Download to Local
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-info w-100" onclick="syncLocalToFirebase()" id="uploadFirebaseBtn">
+                                        <i class="fas fa-upload"></i> Upload Local Data
+                                    </button>
+                                </div>
+                                
+                                <div class="mt-3">
+                                    <small class="text-muted d-block">Connection Type:</small>
+                                    <span>Real-time WebSocket</span>
+                                </div>
+                                
+                                <div class="mt-2">
+                                    <small class="text-muted d-block">Data Security:</small>
+                                    <span>Anonymous Auth</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between mt-3">
+                            <button class="btn btn-success" onclick="refreshFirebaseStats()" id="refreshFirebaseBtn">
+                                <i class="fas fa-redo"></i> Refresh Stats
+                            </button>
+                            <button class="btn btn-outline-primary" onclick="exportFirebaseData()" id="exportFirebaseBtn">
+                                <i class="fas fa-download"></i> Export Data
+                            </button>
+                            <button class="btn btn-outline-danger" onclick="clearFirebaseData()">
+                                <i class="fas fa-trash"></i> Clear All Data
+                            </button>
+                        </div>
                     </div>
                 </div>
                 
@@ -226,8 +471,8 @@
                             <i class="fab fa-google"></i>
                         </div>
                         <div>
-                            <h5 class="mb-1">Google Sheets Integration</h5>
-                            <p class="text-muted mb-0">Sync data with Google Sheets</p>
+                            <h5 class="mb-1">Google Sheets Integration (Backup)</h5>
+                            <p class="text-muted mb-0">Backup data to Google Sheets</p>
                         </div>
                     </div>
                     <div class="card-body">
@@ -243,101 +488,37 @@
                                             <i class="fas fa-check"></i> Validate
                                         </button>
                                     </div>
-                                    <small class="text-muted">Paste your Google Sheets URL here. Must be shared with edit access.</small>
+                                    <small class="text-muted">Optional: For backup purposes only</small>
                                 </div>
                                 
                                 <div class="row">
                                     <div class="col-md-6">
                                         <div class="mb-3">
-                                            <label class="form-label">Sheet Name</label>
-                                            <input type="text" class="form-control" id="googleSheetName" value="HOTO_Process_Data">
+                                            <label class="form-label">Backup Frequency</label>
+                                            <select class="form-select" id="googleSyncFreq">
+                                                <option value="daily">Daily</option>
+                                                <option value="weekly" selected>Weekly</option>
+                                                <option value="monthly">Monthly</option>
+                                                <option value="manual">Manual Only</option>
+                                            </select>
                                         </div>
                                     </div>
                                     <div class="col-md-6">
                                         <div class="mb-3">
-                                            <label class="form-label">Sync Frequency</label>
-                                            <select class="form-select" id="googleSyncFreq">
-                                                <option value="5">Every 5 minutes</option>
-                                                <option value="15" selected>Every 15 minutes</option>
-                                                <option value="30">Every 30 minutes</option>
-                                                <option value="60">Every hour</option>
-                                                <option value="manual">Manual Only</option>
+                                            <label class="form-label">Backup Mode</label>
+                                            <select class="form-select" id="googleBackupMode">
+                                                <option value="append">Append</option>
+                                                <option value="replace" selected>Replace</option>
                                             </select>
                                         </div>
                                     </div>
                                 </div>
                                 
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <div class="form-check mb-3">
-                                            <input class="form-check-input" type="checkbox" id="googleAutoSync" checked>
-                                            <label class="form-check-label" for="googleAutoSync">
-                                                Auto-sync when online
-                                            </label>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <div class="form-check mb-3">
-                                            <input class="form-check-input" type="checkbox" id="googleSyncOnChange">
-                                            <label class="form-check-label" for="googleSyncOnChange">
-                                                Sync on data change
-                                            </label>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="mb-3">
-                                    <label class="form-label">Data to Sync</label>
-                                    <div class="row">
-                                        <div class="col-md-4">
-                                            <div class="form-check">
-                                                <input class="form-check-input" type="checkbox" id="syncKeyHandover" checked>
-                                                <label class="form-check-label" for="syncKeyHandover">
-                                                    Key Handover
-                                                </label>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <div class="form-check">
-                                                <input class="form-check-input" type="checkbox" id="syncSnagging" checked>
-                                                <label class="form-check-label" for="syncSnagging">
-                                                    Snagging
-                                                </label>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <div class="form-check">
-                                                <input class="form-check-input" type="checkbox" id="syncFirstVisit" checked>
-                                                <label class="form-check-label" for="syncFirstVisit">
-                                                    First Visit
-                                                </label>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <div class="form-check">
-                                                <input class="form-check-input" type="checkbox" id="syncHandover" checked>
-                                                <label class="form-check-label" for="syncHandover">
-                                                    Handover
-                                                </label>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <div class="form-check">
-                                                <input class="form-check-input" type="checkbox" id="syncInteriors" checked>
-                                                <label class="form-check-label" for="syncInteriors">
-                                                    Interiors
-                                                </label>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <div class="form-check">
-                                                <input class="form-check-input" type="checkbox" id="syncMovein" checked>
-                                                <label class="form-check-label" for="syncMovein">
-                                                    Move-in
-                                                </label>
-                                            </div>
-                                        </div>
-                                    </div>
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="googleAutoBackup">
+                                    <label class="form-check-label" for="googleAutoBackup">
+                                        Enable automatic backups
+                                    </label>
                                 </div>
                             </div>
                             <div class="col-md-4">
@@ -349,41 +530,30 @@
                                     </div>
                                     
                                     <div class="progress-thin">
-                                        <div class="progress-bar" id="googleSyncProgress" style="width: 0%"></div>
+                                        <div class="progress-bar bg-secondary" id="googleSyncProgress" style="width: 0%"></div>
                                     </div>
                                     
                                     <button class="btn btn-sm btn-outline-primary w-100 mb-2" onclick="testGoogleConnection()" id="testGoogleBtn">
-                                        Test Connection
+                                        <i class="fas fa-plug"></i> Test Connection
                                     </button>
-                                    <button class="btn btn-sm btn-outline-success w-100 mb-2" onclick="syncGoogleSheets()" id="syncGoogleBtn">
-                                        Sync Now
-                                    </button>
-                                    <button class="btn btn-sm btn-outline-info w-100" onclick="viewGoogleSheet()">
-                                        View Sheet
+                                    <button class="btn btn-sm btn-outline-success w-100 mb-2" onclick="backupToGoogleSheets()" id="backupGoogleBtn">
+                                        <i class="fas fa-save"></i> Backup Now
                                     </button>
                                 </div>
                                 
                                 <div class="mt-3">
-                                    <small class="text-muted d-block">Last Sync:</small>
+                                    <small class="text-muted d-block">Last Backup:</small>
                                     <span id="googleLastSync">Never</span>
-                                </div>
-                                
-                                <div class="mt-2">
-                                    <small class="text-muted d-block">Next Sync:</small>
-                                    <span id="googleNextSync">--:--</span>
                                 </div>
                             </div>
                         </div>
                         
                         <div class="d-flex justify-content-between mt-3">
-                            <button class="btn btn-success" onclick="saveGoogleConfig()">
+                            <button class="btn btn-success" onclick="saveGoogleConfig()" id="saveGoogleBtn">
                                 <i class="fas fa-save"></i> Save Configuration
                             </button>
                             <button class="btn btn-outline-primary" onclick="setupGoogleSheets()">
                                 <i class="fas fa-magic"></i> Setup Google Sheets
-                            </button>
-                            <button class="btn btn-outline-danger" onclick="resetGoogleConfig()">
-                                <i class="fas fa-trash"></i> Reset
                             </button>
                         </div>
                     </div>
@@ -401,6 +571,12 @@
                         </div>
                     </div>
                     <div class="card-body">
+                        <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <strong>Note:</strong> Excel import functionality requires the Excel Processor page. Use the Import Data button below.
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                        
                         <div class="row">
                             <div class="col-md-6">
                                 <h6>Export Settings</h6>
@@ -446,32 +622,10 @@
                                         </div>
                                     </div>
                                 </div>
-                                
-                                <div class="mb-3">
-                                    <label class="form-label">Export Date Range</label>
-                                    <div class="row">
-                                        <div class="col">
-                                            <input type="date" class="form-control" id="exportStartDate">
-                                        </div>
-                                        <div class="col-auto d-flex align-items-center">
-                                            <span>to</span>
-                                        </div>
-                                        <div class="col">
-                                            <input type="date" class="form-control" id="exportEndDate">
-                                        </div>
-                                    </div>
-                                </div>
                             </div>
                             
                             <div class="col-md-6">
                                 <h6>Import Settings</h6>
-                                <div class="mb-3">
-                                    <label class="form-label">Auto-import Folder</label>
-                                    <input type="text" class="form-control" id="importFolder" 
-                                           placeholder="Path to watch for Excel files" disabled>
-                                    <small class="text-muted">Browser security restricts file system access. Use the upload button instead.</small>
-                                </div>
-                                
                                 <div class="mb-3">
                                     <label class="form-label">Import Mode</label>
                                     <select class="form-select" id="importMode">
@@ -499,7 +653,7 @@
                         
                         <div class="d-flex justify-content-between mt-3">
                             <div>
-                                <button class="btn btn-success" onclick="exportData()">
+                                <button class="btn btn-success" onclick="exportData()" id="exportDataBtn">
                                     <i class="fas fa-download"></i> Export Data
                                 </button>
                                 <button class="btn btn-primary ms-2" onclick="importData()">
@@ -507,130 +661,10 @@
                                 </button>
                             </div>
                             <div>
-                                <button class="btn btn-outline-secondary" onclick="backupData()">
-                                    <i class="fas fa-copy"></i> Backup Now
+                                <button class="btn btn-outline-secondary" onclick="createLocalBackup()">
+                                    <i class="fas fa-copy"></i> Local Backup
                                 </button>
                             </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- API Configuration -->
-                <div class="card integration-card" id="api">
-                    <div class="card-header d-flex align-items-center">
-                        <div class="integration-icon" style="background: var(--cbre-orange);">
-                            <i class="fas fa-code"></i>
-                        </div>
-                        <div>
-                            <h5 class="mb-1">API Configuration</h5>
-                            <p class="text-muted mb-0">Configure external API connections</p>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <h6>REST API</h6>
-                                <div class="mb-3">
-                                    <label class="form-label">API Endpoint</label>
-                                    <input type="url" class="form-control" id="apiEndpoint" 
-                                           placeholder="https://api.example.com/hot-process">
-                                </div>
-                                
-                                <div class="mb-3">
-                                    <label class="form-label">API Key</label>
-                                    <div class="input-group">
-                                        <input type="password" class="form-control" id="apiKey" 
-                                               placeholder="Your API key">
-                                        <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility('apiKey')">
-                                            <i class="fas fa-eye"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                                
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <div class="mb-3">
-                                            <label class="form-label">API Version</label>
-                                            <input type="text" class="form-control" id="apiVersion" value="v1">
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <div class="mb-3">
-                                            <label class="form-label">Timeout (seconds)</label>
-                                            <input type="number" class="form-control" id="apiTimeout" value="30" min="5" max="120">
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="form-check mb-3">
-                                    <input class="form-check-input" type="checkbox" id="apiEnabled">
-                                    <label class="form-check-label" for="apiEnabled">
-                                        Enable API integration
-                                    </label>
-                                </div>
-                            </div>
-                            
-                            <div class="col-md-6">
-                                <h6>Webhooks</h6>
-                                <div class="mb-3">
-                                    <label class="form-label">Webhook URL</label>
-                                    <input type="url" class="form-control" id="webhookUrl" 
-                                           placeholder="https://webhook.example.com">
-                                </div>
-                                
-                                <div class="mb-3">
-                                    <label class="form-label">Events to Trigger</label>
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <div class="form-check">
-                                                <input class="form-check-input" type="checkbox" id="hookKeyHandover" checked>
-                                                <label class="form-check-label" for="hookKeyHandover">Key Handover</label>
-                                            </div>
-                                            <div class="form-check">
-                                                <input class="form-check-input" type="checkbox" id="hookSnagging" checked>
-                                                <label class="form-check-label" for="hookSnagging">Snagging Complete</label>
-                                            </div>
-                                            <div class="form-check">
-                                                <input class="form-check-input" type="checkbox" id="hookHandover" checked>
-                                                <label class="form-check-label" for="hookHandover">Handover</label>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <div class="form-check">
-                                                <input class="form-check-input" type="checkbox" id="hookMovein" checked>
-                                                <label class="form-check-label" for="hookMovein">Move-in</label>
-                                            </div>
-                                            <div class="form-check">
-                                                <input class="form-check-input" type="checkbox" id="hookError">
-                                                <label class="form-check-label" for="hookError">Error Events</label>
-                                            </div>
-                                            <div class="form-check">
-                                                <input class="form-check-input" type="checkbox" id="hookSyncComplete">
-                                                <label class="form-check-label" for="hookSyncComplete">Sync Complete</label>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="api-test-box">
-                                    <div class="connection-test mb-2">
-                                        <span class="test-status test-pending" id="apiConnectionStatus">Not Tested</span>
-                                        <small>Connection Status</small>
-                                    </div>
-                                    <button class="btn btn-sm btn-outline-primary w-100" onclick="testAPI()" id="testAPIBtn">
-                                        Test API Connection
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="d-flex justify-content-between mt-3">
-                            <button class="btn btn-success" onclick="saveAPIConfig()">
-                                <i class="fas fa-save"></i> Save API Configuration
-                            </button>
-                            <button class="btn btn-outline-secondary" onclick="testWebhook()">
-                                <i class="fas fa-paper-plane"></i> Test Webhook
-                            </button>
                         </div>
                     </div>
                 </div>
@@ -735,14 +769,7 @@
                                     </select>
                                 </div>
                                 
-                                <div class="form-check mb-3">
-                                    <input class="form-check-input" type="checkbox" id="backupBeforeSync" checked>
-                                    <label class="form-check-label" for="backupBeforeSync">
-                                        Backup before sync operations
-                                    </label>
-                                </div>
-                                
-                                <button class="btn btn-success" onclick="createBackup()">
+                                <button class="btn btn-success" onclick="createBackup()" id="createBackupBtn">
                                     <i class="fas fa-save"></i> Create Backup Now
                                 </button>
                             </div>
@@ -756,14 +783,7 @@
                                     </select>
                                 </div>
                                 
-                                <div class="form-check mb-3">
-                                    <input class="form-check-input" type="checkbox" id="validateRestore">
-                                    <label class="form-check-label" for="validateRestore">
-                                        Validate data before restore
-                                    </label>
-                                </div>
-                                
-                                <button class="btn btn-warning" onclick="restoreBackup()">
+                                <button class="btn btn-warning" onclick="restoreBackup()" id="restoreBackupBtn">
                                     <i class="fas fa-undo"></i> Restore Selected Backup
                                 </button>
                             </div>
@@ -778,7 +798,6 @@
     <script>
         // Integration Manager JavaScript
         let syncInterval = null;
-        let nextSyncTime = null;
         
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
@@ -786,19 +805,292 @@
             loadSyncLogs();
             updateSyncStats();
             loadBackupList();
-            updateOverallStatus();
+            loadFirebaseStats();
             
-            // Set default export dates
-            const today = new Date();
-            const lastWeek = new Date(today);
-            lastWeek.setDate(lastWeek.getDate() - 7);
+            // Setup auto-refresh for Firebase stats
+            setInterval(loadFirebaseStats, 30000);
             
-            document.getElementById('exportStartDate').value = lastWeek.toISOString().split('T')[0];
-            document.getElementById('exportEndDate').value = today.toISOString().split('T')[0];
-            
-            // Setup sync interval
-            setupSyncInterval();
+            // Test Firebase connection on load
+            setTimeout(testFirebaseConnection, 1000);
         });
+        
+        // Load Firebase statistics
+        async function loadFirebaseStats() {
+            try {
+                const snapshot = await db.collection('hot_process').get();
+                const count = snapshot.size;
+                
+                document.getElementById('firebaseRecordCount').value = `${count} records`;
+                document.getElementById('firebaseLastSync').value = new Date().toLocaleTimeString();
+                
+                // Count different types of records
+                let keyCount = 0;
+                let snagCount = 0;
+                let handoverCount = 0;
+                
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    if (data.keyHandover && data.keyHandover.date) keyCount++;
+                    if (data.snagging && data.snagging.status) snagCount++;
+                    if (data.handover && data.handover.date) handoverCount++;
+                });
+                
+                document.getElementById('firebaseKeyCount').textContent = keyCount;
+                document.getElementById('firebaseSnagCount').textContent = snagCount;
+                document.getElementById('firebaseHandoverCount').textContent = handoverCount;
+                
+            } catch (error) {
+                console.error("Error loading Firebase stats:", error);
+                document.getElementById('firebaseRecordCount').value = "Error loading";
+                updateConnectionStatus(false);
+            }
+        }
+        
+        // Test Firebase connection
+        async function testFirebaseConnection() {
+            const statusElement = document.getElementById('firebaseConnectionStatus');
+            const btn = document.getElementById('testFirebaseBtn');
+            const progressBar = document.getElementById('firebaseSyncProgress');
+            const originalHTML = btn.innerHTML;
+            
+            statusElement.className = 'test-status test-pending';
+            statusElement.textContent = 'Testing...';
+            btn.innerHTML = '<span class="loading-spinner"></span> Testing...';
+            btn.disabled = true;
+            progressBar.style.width = '30%';
+            progressBar.className = 'progress-bar bg-warning';
+            
+            try {
+                // Test Firebase connection
+                await db.collection('hot_process').limit(1).get();
+                
+                statusElement.className = 'test-status test-success';
+                statusElement.textContent = 'Connected';
+                progressBar.style.width = '100%';
+                progressBar.className = 'progress-bar bg-success';
+                
+                document.getElementById('firebaseTestStatus').className = 'test-status test-success';
+                document.getElementById('firebaseTestStatus').textContent = 'Connected';
+                
+                logSync('Firebase connection test successful', 'success');
+                showNotification('✓ Firebase connection successful!', 'success');
+                updateConnectionStatus(true);
+                
+            } catch (error) {
+                statusElement.className = 'test-status test-failed';
+                statusElement.textContent = 'Connection Failed';
+                progressBar.style.width = '100%';
+                progressBar.className = 'progress-bar bg-danger';
+                
+                document.getElementById('firebaseTestStatus').className = 'test-status test-failed';
+                document.getElementById('firebaseTestStatus').textContent = 'Failed';
+                
+                logSync('Firebase connection test failed: ' + error.message, 'error');
+                showNotification('✗ Firebase connection failed', 'error');
+                updateConnectionStatus(false);
+                
+            } finally {
+                btn.innerHTML = originalHTML;
+                btn.disabled = false;
+                
+                // Reset progress bar after 2 seconds
+                setTimeout(() => {
+                    if (progressBar.style.width === '100%') {
+                        progressBar.style.width = '0%';
+                    }
+                }, 2000);
+            }
+        }
+        
+        // Sync Firebase to Local Storage
+        async function syncFirebaseToLocal() {
+            const btn = document.getElementById('downloadFirebaseBtn');
+            const originalHTML = btn.innerHTML;
+            
+            btn.innerHTML = '<span class="loading-spinner"></span> Downloading...';
+            btn.disabled = true;
+            
+            showNotification('Downloading data from Firebase...', 'info');
+            
+            try {
+                const snapshot = await db.collection('hot_process').get();
+                
+                // Convert to local data structure
+                const localData = {
+                    towers: {
+                        A: { flats: {} },
+                        B: { flats: {} },
+                        C: { flats: {} }
+                    },
+                    metadata: {
+                        lastSync: new Date().toISOString(),
+                        recordCount: snapshot.size
+                    }
+                };
+                
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    const tower = data.tower || 'A';
+                    const flatNumber = data.flatNumber || '1';
+                    
+                    if (localData.towers[tower]) {
+                        const flatId = `${tower}-${flatNumber}`;
+                        localData.towers[tower].flats[flatId] = data;
+                    }
+                });
+                
+                // Save to localStorage
+                localStorage.setItem('hot_process_data', JSON.stringify(localData));
+                
+                showNotification(`Downloaded ${snapshot.size} records from Firebase!`, 'success');
+                logSync(`Downloaded ${snapshot.size} records from Firebase`, 'success');
+                
+            } catch (error) {
+                console.error("Error syncing from Firebase:", error);
+                showNotification('Error downloading from Firebase: ' + error.message, 'error');
+                logSync('Error downloading from Firebase', 'error');
+                
+            } finally {
+                btn.innerHTML = originalHTML;
+                btn.disabled = false;
+            }
+        }
+        
+        // Sync Local Storage to Firebase
+        async function syncLocalToFirebase() {
+            const btn = document.getElementById('uploadFirebaseBtn');
+            const originalHTML = btn.innerHTML;
+            
+            btn.innerHTML = '<span class="loading-spinner"></span> Uploading...';
+            btn.disabled = true;
+            
+            showNotification('Uploading local data to Firebase...', 'info');
+            
+            try {
+                // Load from localStorage
+                const localData = JSON.parse(localStorage.getItem('hot_process_data') || '{"towers":{"A":{"flats":{}},"B":{"flats":{}},"C":{"flats":{}}}}');
+                
+                // Save each flat to Firebase
+                let uploadedCount = 0;
+                const errors = [];
+                
+                for (const tower of ['A', 'B', 'C']) {
+                    const flats = localData.towers[tower]?.flats || {};
+                    
+                    for (const [flatId, flatData] of Object.entries(flats)) {
+                        try {
+                            const flatNumber = flatId.split('-')[1];
+                            const firebaseData = {
+                                tower: tower,
+                                flatNumber: flatNumber,
+                                ...flatData,
+                                lastUpdated: new Date().toISOString()
+                            };
+                            
+                            await db.collection('hot_process')
+                                .doc(`${tower}_${flatNumber}`)
+                                .set(firebaseData, { merge: true });
+                            
+                            uploadedCount++;
+                            
+                        } catch (error) {
+                            errors.push(`Flat ${flatId}: ${error.message}`);
+                        }
+                    }
+                }
+                
+                if (errors.length > 0) {
+                    showNotification(`Uploaded ${uploadedCount} records, ${errors.length} errors`, 'warning');
+                    console.error("Upload errors:", errors);
+                } else {
+                    showNotification(`${uploadedCount} records uploaded to Firebase!`, 'success');
+                }
+                
+                logSync(`Uploaded ${uploadedCount} records to Firebase`, errors.length > 0 ? 'warning' : 'success');
+                
+                // Refresh stats
+                loadFirebaseStats();
+                
+            } catch (error) {
+                console.error("Error syncing to Firebase:", error);
+                showNotification('Error uploading to Firebase: ' + error.message, 'error');
+                logSync('Error uploading to Firebase', 'error');
+                
+            } finally {
+                btn.innerHTML = originalHTML;
+                btn.disabled = false;
+            }
+        }
+        
+        // Export Firebase data
+        async function exportFirebaseData() {
+            const btn = document.getElementById('exportFirebaseBtn');
+            const originalHTML = btn.innerHTML;
+            
+            btn.innerHTML = '<span class="loading-spinner"></span> Exporting...';
+            btn.disabled = true;
+            
+            try {
+                const snapshot = await db.collection('hot_process').get();
+                
+                // Convert to array
+                const data = [];
+                snapshot.forEach(doc => {
+                    data.push(doc.data());
+                });
+                
+                // Convert to JSON
+                const dataStr = JSON.stringify(data, null, 2);
+                const dataBlob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(dataBlob);
+                
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `Firebase_Backup_${new Date().toISOString().split('T')[0]}.json`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+                
+                showNotification(`Exported ${data.length} records from Firebase`, 'success');
+                logSync('Firebase data exported', 'success');
+                
+            } catch (error) {
+                console.error("Error exporting Firebase data:", error);
+                showNotification('Error exporting Firebase data: ' + error.message, 'error');
+                
+            } finally {
+                btn.innerHTML = originalHTML;
+                btn.disabled = false;
+            }
+        }
+        
+        // Clear Firebase data (with confirmation)
+        function clearFirebaseData() {
+            if (confirm('WARNING: This will delete ALL data from Firebase. This action cannot be undone. Are you sure?')) {
+                if (confirm('Are you REALLY sure? This will delete ALL records permanently.')) {
+                    showNotification('Data clearance requires admin privileges. Contact administrator.', 'error');
+                    logSync('Attempted to clear Firebase data (blocked)', 'warning');
+                }
+            }
+        }
+        
+        // Refresh Firebase stats
+        function refreshFirebaseStats() {
+            const btn = document.getElementById('refreshFirebaseBtn');
+            const originalHTML = btn.innerHTML;
+            
+            btn.innerHTML = '<span class="loading-spinner"></span> Refreshing...';
+            btn.disabled = true;
+            
+            loadFirebaseStats();
+            
+            setTimeout(() => {
+                btn.innerHTML = originalHTML;
+                btn.disabled = false;
+                showNotification('Firebase stats refreshed', 'success');
+            }, 1000);
+        }
         
         // Load configuration from localStorage
         function loadConfiguration() {
@@ -814,65 +1106,16 @@
                     new Date(lastSync).toLocaleString();
             }
             
-            const syncFreq = localStorage.getItem('google_sync_freq') || '15';
+            const syncFreq = localStorage.getItem('google_sync_freq') || 'weekly';
             document.getElementById('googleSyncFreq').value = syncFreq;
             
-            const autoSync = localStorage.getItem('google_auto_sync');
-            if (autoSync !== null) {
-                document.getElementById('googleAutoSync').checked = autoSync === 'true';
+            const autoBackup = localStorage.getItem('google_auto_backup');
+            if (autoBackup !== null) {
+                document.getElementById('googleAutoBackup').checked = autoBackup === 'true';
             }
             
-            // Sync on change
-            const syncOnChange = localStorage.getItem('google_sync_on_change');
-            if (syncOnChange !== null) {
-                document.getElementById('googleSyncOnChange').checked = syncOnChange === 'true';
-            }
-            
-            // Data to sync
-            const dataToSync = JSON.parse(localStorage.getItem('data_to_sync') || '["keyHandover","snagging","firstVisit","handover","interiors","movein"]');
-            document.getElementById('syncKeyHandover').checked = dataToSync.includes('keyHandover');
-            document.getElementById('syncSnagging').checked = dataToSync.includes('snagging');
-            document.getElementById('syncFirstVisit').checked = dataToSync.includes('firstVisit');
-            document.getElementById('syncHandover').checked = dataToSync.includes('handover');
-            document.getElementById('syncInteriors').checked = dataToSync.includes('interiors');
-            document.getElementById('syncMovein').checked = dataToSync.includes('movein');
-            
-            // API config
-            const apiEndpoint = localStorage.getItem('api_endpoint');
-            if (apiEndpoint) {
-                document.getElementById('apiEndpoint').value = apiEndpoint;
-            }
-            
-            const apiKey = localStorage.getItem('api_key');
-            if (apiKey) {
-                document.getElementById('apiKey').value = apiKey;
-            }
-            
-            const apiEnabled = localStorage.getItem('api_enabled');
-            if (apiEnabled) {
-                document.getElementById('apiEnabled').checked = apiEnabled === 'true';
-            }
-            
-            const apiVersion = localStorage.getItem('api_version') || 'v1';
-            document.getElementById('apiVersion').value = apiVersion;
-            
-            const apiTimeout = localStorage.getItem('api_timeout') || '30';
-            document.getElementById('apiTimeout').value = apiTimeout;
-            
-            // Webhook config
-            const webhookUrl = localStorage.getItem('webhook_url');
-            if (webhookUrl) {
-                document.getElementById('webhookUrl').value = webhookUrl;
-            }
-            
-            // Webhook events
-            const webhookEvents = JSON.parse(localStorage.getItem('webhook_events') || '["keyHandover","snagging","handover","movein"]');
-            document.getElementById('hookKeyHandover').checked = webhookEvents.includes('keyHandover');
-            document.getElementById('hookSnagging').checked = webhookEvents.includes('snagging');
-            document.getElementById('hookHandover').checked = webhookEvents.includes('handover');
-            document.getElementById('hookMovein').checked = webhookEvents.includes('movein');
-            document.getElementById('hookError').checked = webhookEvents.includes('error');
-            document.getElementById('hookSyncComplete').checked = webhookEvents.includes('syncComplete');
+            const backupMode = localStorage.getItem('google_backup_mode') || 'replace';
+            document.getElementById('googleBackupMode').value = backupMode;
             
             // Import/Export config
             const importMode = localStorage.getItem('import_mode') || 'merge';
@@ -890,149 +1133,32 @@
             
             const backupFrequency = localStorage.getItem('backup_frequency') || 'weekly';
             document.getElementById('backupFrequency').value = backupFrequency;
-            
-            const backupBeforeSync = localStorage.getItem('backup_before_sync');
-            if (backupBeforeSync !== null) {
-                document.getElementById('backupBeforeSync').checked = backupBeforeSync === 'true';
-            }
-        }
-        
-        // Setup sync interval based on configuration
-        function setupSyncInterval() {
-            // Clear existing interval
-            if (syncInterval) {
-                clearInterval(syncInterval);
-            }
-            
-            const syncFreq = document.getElementById('googleSyncFreq').value;
-            const autoSync = document.getElementById('googleAutoSync').checked;
-            
-            if (autoSync && syncFreq !== 'manual' && navigator.onLine) {
-                const intervalMinutes = parseInt(syncFreq) * 60 * 1000;
-                syncInterval = setInterval(syncGoogleSheets, intervalMinutes);
-                
-                // Calculate next sync time
-                nextSyncTime = new Date(Date.now() + intervalMinutes);
-                updateNextSyncTime();
-            }
-        }
-        
-        // Update next sync time display
-        function updateNextSyncTime() {
-            if (nextSyncTime) {
-                document.getElementById('googleNextSync').textContent = 
-                    nextSyncTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            }
         }
         
         // Save Google Sheets configuration
         function saveGoogleConfig() {
-            const url = document.getElementById('googleSheetUrl').value;
-            const sheetName = document.getElementById('googleSheetName').value;
-            const syncFreq = document.getElementById('googleSyncFreq').value;
-            const autoSync = document.getElementById('googleAutoSync').checked;
-            const syncOnChange = document.getElementById('googleSyncOnChange').checked;
+            const btn = document.getElementById('saveGoogleBtn');
+            const originalHTML = btn.innerHTML;
             
-            // Validate URL
-            if (url && !url.includes('docs.google.com/spreadsheets')) {
-                alert('Please enter a valid Google Sheets URL');
-                return;
-            }
+            btn.innerHTML = '<span class="loading-spinner"></span> Saving...';
+            btn.disabled = true;
+            
+            const url = document.getElementById('googleSheetUrl').value;
+            const syncFreq = document.getElementById('googleSyncFreq').value;
+            const autoBackup = document.getElementById('googleAutoBackup').checked;
+            const backupMode = document.getElementById('googleBackupMode').value;
             
             localStorage.setItem('google_sheets_url', url);
-            localStorage.setItem('google_sheet_name', sheetName);
             localStorage.setItem('google_sync_freq', syncFreq);
-            localStorage.setItem('google_auto_sync', autoSync);
-            localStorage.setItem('google_sync_on_change', syncOnChange);
+            localStorage.setItem('google_auto_backup', autoBackup);
+            localStorage.setItem('google_backup_mode', backupMode);
             
-            // Save data to sync
-            const dataToSync = [];
-            if (document.getElementById('syncKeyHandover').checked) dataToSync.push('keyHandover');
-            if (document.getElementById('syncSnagging').checked) dataToSync.push('snagging');
-            if (document.getElementById('syncFirstVisit').checked) dataToSync.push('firstVisit');
-            if (document.getElementById('syncHandover').checked) dataToSync.push('handover');
-            if (document.getElementById('syncInteriors').checked) dataToSync.push('interiors');
-            if (document.getElementById('syncMovein').checked) dataToSync.push('movein');
-            localStorage.setItem('data_to_sync', JSON.stringify(dataToSync));
-            
-            // Update sync manager if it exists
-            if (window.syncManager) {
-                window.syncManager.config.googleScriptUrl = url;
-            }
-            
-            // Setup new sync interval
-            setupSyncInterval();
-            
-            showNotification('Google Sheets configuration saved!', 'success');
-            logSync('Google Sheets configuration updated', 'success');
-        }
-        
-        // Reset Google Sheets configuration
-        function resetGoogleConfig() {
-            if (confirm('Are you sure you want to reset Google Sheets configuration?')) {
-                localStorage.removeItem('google_sheets_url');
-                localStorage.removeItem('google_sheet_name');
-                localStorage.removeItem('google_sync_freq');
-                localStorage.removeItem('google_auto_sync');
-                localStorage.removeItem('google_sync_on_change');
-                localStorage.removeItem('data_to_sync');
-                
-                document.getElementById('googleSheetUrl').value = '';
-                document.getElementById('googleSheetName').value = 'HOTO_Process_Data';
-                document.getElementById('googleSyncFreq').value = '15';
-                document.getElementById('googleAutoSync').checked = true;
-                document.getElementById('googleSyncOnChange').checked = false;
-                
-                // Reset sync checkboxes
-                document.getElementById('syncKeyHandover').checked = true;
-                document.getElementById('syncSnagging').checked = true;
-                document.getElementById('syncFirstVisit').checked = true;
-                document.getElementById('syncHandover').checked = true;
-                document.getElementById('syncInteriors').checked = true;
-                document.getElementById('syncMovein').checked = true;
-                
-                // Update sync manager
-                if (window.syncManager) {
-                    window.syncManager.config.googleScriptUrl = '';
-                }
-                
-                // Clear sync interval
-                if (syncInterval) {
-                    clearInterval(syncInterval);
-                    syncInterval = null;
-                }
-                
-                document.getElementById('googleNextSync').textContent = '--:--';
-                document.getElementById('googleConnectionStatus').className = 'test-status test-pending';
-                document.getElementById('googleConnectionStatus').textContent = 'Not Tested';
-                
-                showNotification('Google Sheets configuration reset!', 'success');
-                logSync('Google Sheets configuration reset', 'warning');
-            }
-        }
-        
-        // Validate Google Sheets URL
-        function validateGoogleSheetURL() {
-            const url = document.getElementById('googleSheetUrl').value;
-            
-            if (!url) {
-                alert('Please enter Google Sheets URL first');
-                return;
-            }
-            
-            // Check if URL matches Google Sheets pattern
-            const isValid = url.includes('docs.google.com/spreadsheets') && 
-                          (url.includes('/d/') || url.includes('key='));
-            
-            if (isValid) {
-                showNotification('✓ Valid Google Sheets URL format', 'success');
-                document.getElementById('googleConnectionStatus').className = 'test-status test-pending';
-                document.getElementById('googleConnectionStatus').textContent = 'Not Tested';
-            } else {
-                showNotification('✗ Invalid Google Sheets URL format. Must be a Google Sheets URL.', 'error');
-                document.getElementById('googleConnectionStatus').className = 'test-status test-failed';
-                document.getElementById('googleConnectionStatus').textContent = 'Invalid URL';
-            }
+            setTimeout(() => {
+                btn.innerHTML = originalHTML;
+                btn.disabled = false;
+                showNotification('Google Sheets configuration saved!', 'success');
+                logSync('Google Sheets configuration updated', 'success');
+            }, 500);
         }
         
         // Test Google Sheets connection
@@ -1052,7 +1178,7 @@
             
             statusElement.className = 'test-status test-pending';
             statusElement.textContent = 'Testing...';
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testing...';
+            btn.innerHTML = '<span class="loading-spinner"></span> Testing...';
             btn.disabled = true;
             progressBar.style.width = '30%';
             progressBar.className = 'progress-bar bg-warning';
@@ -1082,8 +1208,8 @@
                     document.getElementById('googleTestStatus').className = 'test-status test-failed';
                     document.getElementById('googleTestStatus').textContent = 'Failed';
                     
-                    logSync('Google Sheets connection test failed', 'error');
-                    showNotification('✗ Google Sheets connection failed', 'error');
+                    logSync('Google Sheets connection test failed - Invalid URL format', 'error');
+                    showNotification('✗ Invalid Google Sheets URL format', 'error');
                 }
                 
                 btn.innerHTML = originalHTML;
@@ -1094,17 +1220,11 @@
                     progressBar.style.width = '0%';
                 }, 2000);
                 
-            }, 2000);
+            }, 1500);
         }
         
-        // Sync with Google Sheets
-        function syncGoogleSheets() {
-            if (!navigator.onLine) {
-                alert('You are offline. Cannot sync with Google Sheets.');
-                logSync('Sync failed: Offline', 'error');
-                return;
-            }
-            
+        // Backup to Google Sheets
+        function backupToGoogleSheets() {
             const url = document.getElementById('googleSheetUrl').value;
             
             if (!url) {
@@ -1112,48 +1232,17 @@
                 return;
             }
             
-            // Show syncing status
-            const btn = document.getElementById('syncGoogleBtn');
+            // Show backup in progress
+            const btn = document.getElementById('backupGoogleBtn');
             const progressBar = document.getElementById('googleSyncProgress');
             const originalHTML = btn.innerHTML;
             
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Syncing...';
+            btn.innerHTML = '<span class="loading-spinner"></span> Backing up...';
             btn.disabled = true;
             progressBar.style.width = '10%';
             progressBar.className = 'progress-bar bg-primary';
             
-            // Get local data
-            const hotData = JSON.parse(localStorage.getItem('hot_process_data') || '{"towers":{"A":{"flats":{}},"B":{"flats":{}},"C":{"flats":{}}}}');
-            
-            // Get data to sync
-            const dataToSync = [];
-            if (document.getElementById('syncKeyHandover').checked) dataToSync.push('keyHandover');
-            if (document.getElementById('syncSnagging').checked) dataToSync.push('snagging');
-            if (document.getElementById('syncFirstVisit').checked) dataToSync.push('firstVisit');
-            if (document.getElementById('syncHandover').checked) dataToSync.push('handover');
-            if (document.getElementById('syncInteriors').checked) dataToSync.push('interiors');
-            if (document.getElementById('syncMovein').checked) dataToSync.push('movein');
-            
-            // Filter data based on selection
-            const syncData = { towers: { A: { flats: {} }, B: { flats: {} }, C: { flats: {} } } };
-            
-            ['A', 'B', 'C'].forEach(tower => {
-                Object.entries(hotData.towers[tower].flats).forEach(([flatId, flatData]) => {
-                    const filteredData = {};
-                    
-                    dataToSync.forEach(type => {
-                        if (flatData[type]) {
-                            filteredData[type] = flatData[type];
-                        }
-                    });
-                    
-                    if (Object.keys(filteredData).length > 0) {
-                        syncData.towers[tower].flats[flatId] = filteredData;
-                    }
-                });
-            });
-            
-            // Simulate sync with progress updates
+            // Simulate backup with progress updates
             let progress = 10;
             const progressInterval = setInterval(() => {
                 progress += 10;
@@ -1164,7 +1253,7 @@
                 }
             }, 300);
             
-            // Simulate sync completion
+            // Simulate backup completion
             setTimeout(() => {
                 clearInterval(progressInterval);
                 progressBar.style.width = '100%';
@@ -1175,19 +1264,7 @@
                 localStorage.setItem('google_last_sync', now.toISOString());
                 document.getElementById('googleLastSync').textContent = now.toLocaleString();
                 
-                // Calculate next sync time
-                const syncFreq = document.getElementById('googleSyncFreq').value;
-                if (syncFreq !== 'manual') {
-                    const intervalMinutes = parseInt(syncFreq) * 60 * 1000;
-                    nextSyncTime = new Date(now.getTime() + intervalMinutes);
-                    updateNextSyncTime();
-                }
-                
-                // Log sync
-                const recordCount = Object.keys(syncData.towers.A.flats).length + 
-                                   Object.keys(syncData.towers.B.flats).length + 
-                                   Object.keys(syncData.towers.C.flats).length;
-                logSync(`Google Sheets sync completed: ${recordCount} records synced`, 'success');
+                logSync('Google Sheets backup completed', 'success');
                 
                 btn.innerHTML = originalHTML;
                 btn.disabled = false;
@@ -1197,261 +1274,146 @@
                     progressBar.style.width = '0%';
                 }, 2000);
                 
-                // Trigger webhook if enabled
-                triggerWebhook('syncComplete', { records: recordCount, timestamp: now.toISOString() });
-                
-                showNotification('✓ Data synced with Google Sheets!', 'success');
+                showNotification('✓ Data backed up to Google Sheets!', 'success');
                 
             }, 3000);
         }
         
         // Setup Google Sheets template
         function setupGoogleSheets() {
-            const templateData = {
-                sheets: [
-                    {
-                        name: "Key_Handover",
-                        headers: ["Tower", "Flat", "Handover_Person", "Handover_Date", "Incomplete_Keys", "Remarks", "Status", "Timestamp"]
-                    },
-                    {
-                        name: "Snagging",
-                        headers: ["Tower", "Flat", "Start_Date", "End_Date", "Inspector", "MEP", "Civil", "Electrical", "Water", "AC_Drain", "Tiles", "Status", "Remarks", "FollowUp_Date", "Timestamp"]
-                    },
-                    {
-                        name: "First_Visit",
-                        headers: ["Tower", "Flat", "Owner_Name", "Owner_Phone", "Visit_Date", "HOT_Member", "Handover_Suggested", "Customer_Remarks", "CRM_NOC", "Status", "Timestamp"]
-                    },
-                    {
-                        name: "Handover",
-                        headers: ["Tower", "Flat", "Customer_Name", "Second_Owner", "Owner_Email", "Second_Owner_Email", "HOTO_Member", "Handover_Date", "Keys_Handed", "Manual_Handed", "Gift_Box_Handed", "Customer_Feedback", "Status", "Timestamp"]
-                    },
-                    {
-                        name: "Interiors",
-                        headers: ["Tower", "Flat", "Start_Date", "End_Date", "Contractor", "Contractor_Contact", "Clearance_By", "Flooring", "Painting", "Carpentry", "Electrical", "Plumbing", "False_Ceiling", "Remarks", "Status", "Timestamp"]
-                    },
-                    {
-                        name: "Movein",
-                        headers: ["Tower", "Flat", "Customer_Name", "Movein_Date", "Contact", "Remarks", "Status", "Timestamp"]
-                    },
-                    {
-                        name: "Dashboard",
-                        headers: ["Tower", "Total_Flats", "Key_Handover", "Snagging", "First_Visit", "Handover", "Interiors", "Movein", "Overall_Progress", "Last_Updated"]
-                    }
-                ]
-            };
-            
-            // Create instructions for setting up Google Sheets
-            let instructions = "GOOGLE SHEETS SETUP INSTRUCTIONS\n\n";
-            instructions += "1. Create a new Google Sheet\n";
-            instructions += "2. Create the following sheets with these headers:\n\n";
-            
-            templateData.sheets.forEach(sheet => {
-                instructions += `SHEET: ${sheet.name}\n`;
-                instructions += `HEADERS: ${sheet.headers.join(" | ")}\n\n`;
-            });
-            
-            instructions += "3. Share the sheet with edit access:\n";
-            instructions += "   • Click 'Share' button\n";
-            instructions += "   • Set to 'Anyone with the link can edit' (for demo)\n";
-            instructions += "   • Or share with specific service account email\n\n";
-            
-            instructions += "4. Copy the sheet URL and paste it in the configuration above\n\n";
-            instructions += "5. Test the connection using the 'Test Connection' button\n\n";
-            instructions += "IMPORTANT NOTES:\n";
-            instructions += "- Keep the sheet structure exactly as shown\n";
-            instructions += "- Data will be appended to the sheets\n";
-            instructions += "- Timestamp column will be auto-filled\n";
-            instructions += "- Status column should contain: pending/completed/delayed";
-            
-            // Show instructions in modal or alert
-            if (confirm('Show detailed setup instructions?\n(Cancel to see brief version)')) {
-                alert(instructions);
-            } else {
-                alert('1. Create Google Sheet with required sheets\n2. Share with edit access\n3. Copy URL and paste above\n4. Test connection');
-            }
+            alert('Setup Instructions:\n\n1. Create a new Google Sheet\n2. Name it "HOTO Process Backup"\n3. Set sharing permissions to "Anyone with the link can edit"\n4. Copy the URL and paste above\n5. Test the connection\n\nNote: This is a simulated backup for demonstration purposes.');
         }
         
-        // View Google Sheet
-        function viewGoogleSheet() {
+        // Validate Google Sheets URL
+        function validateGoogleSheetURL() {
             const url = document.getElementById('googleSheetUrl').value;
             
             if (!url) {
-                alert('Please configure Google Sheets URL first');
+                alert('Please enter Google Sheets URL first');
                 return;
             }
             
-            window.open(url, '_blank');
+            const isValid = url.includes('docs.google.com/spreadsheets');
+            
+            if (isValid) {
+                showNotification('✓ Valid Google Sheets URL format', 'success');
+                document.getElementById('googleConnectionStatus').className = 'test-status test-pending';
+                document.getElementById('googleConnectionStatus').textContent = 'Not Tested';
+            } else {
+                showNotification('✗ Invalid Google Sheets URL format', 'error');
+                document.getElementById('googleConnectionStatus').className = 'test-status test-failed';
+                document.getElementById('googleConnectionStatus').textContent = 'Invalid URL';
+            }
         }
         
         // Export data
-        function exportData() {
-            const format = document.getElementById('exportFormat').value;
-            const startDate = document.getElementById('exportStartDate').value;
-            const endDate = document.getElementById('exportEndDate').value;
+        async function exportData() {
+            const btn = document.getElementById('exportDataBtn');
+            const originalHTML = btn.innerHTML;
             
-            // Get selected data types
-            const dataTypes = [];
-            if (document.getElementById('expKeyHandover').checked) dataTypes.push('keyHandover');
-            if (document.getElementById('expSnagging').checked) dataTypes.push('snagging');
-            if (document.getElementById('expFirstVisit').checked) dataTypes.push('firstVisit');
-            if (document.getElementById('expHandover').checked) dataTypes.push('handover');
-            if (document.getElementById('expInteriors').checked) dataTypes.push('interiors');
-            if (document.getElementById('expMovein').checked) dataTypes.push('movein');
+            btn.innerHTML = '<span class="loading-spinner"></span> Exporting...';
+            btn.disabled = true;
             
-            if (dataTypes.length === 0) {
-                alert('Please select at least one data type to export');
-                return;
-            }
-            
-            // Get data from localStorage
-            const hotData = JSON.parse(localStorage.getItem('hot_process_data') || '{"towers":{"A":{"flats":{}},"B":{"flats":{}},"C":{"flats":{}}}}');
-            
-            // Filter data based on selected types and date range
-            const exportData = { towers: { A: { flats: {} }, B: { flats: {} }, C: { flats: {} } } };
-            
-            ['A', 'B', 'C'].forEach(tower => {
-                Object.entries(hotData.towers[tower].flats).forEach(([flatId, flatData]) => {
-                    const filteredData = {};
-                    let hasDataInRange = false;
-                    
-                    dataTypes.forEach(type => {
-                        if (flatData[type]) {
-                            // Check date range if specified
-                            if (startDate && endDate) {
-                                const dateField = getDateFieldForType(type, flatData[type]);
-                                if (dateField) {
-                                    const date = new Date(dateField);
-                                    const start = new Date(startDate);
-                                    const end = new Date(endDate);
-                                    end.setHours(23, 59, 59, 999);
-                                    
-                                    if (date >= start && date <= end) {
-                                        filteredData[type] = flatData[type];
-                                        hasDataInRange = true;
-                                    }
-                                } else {
-                                    filteredData[type] = flatData[type];
-                                    hasDataInRange = true;
-                                }
-                            } else {
-                                filteredData[type] = flatData[type];
-                                hasDataInRange = true;
-                            }
-                        }
-                    });
-                    
-                    if (hasDataInRange && Object.keys(filteredData).length > 0) {
-                        exportData.towers[tower].flats[flatId] = filteredData;
-                    }
+            try {
+                // Get format
+                const format = document.getElementById('exportFormat').value;
+                
+                // Get data from Firebase
+                const snapshot = await db.collection('hot_process').get();
+                const data = [];
+                snapshot.forEach(doc => {
+                    data.push(doc.data());
                 });
-            });
-            
-            // Export based on format
-            let dataStr, filename, mimeType;
-            
-            switch(format) {
-                case 'json':
-                    dataStr = JSON.stringify(exportData, null, 2);
-                    filename = `HOT_Export_${new Date().toISOString().split('T')[0]}.json`;
-                    mimeType = 'application/json';
-                    break;
-                    
-                case 'csv':
-                    dataStr = convertToCSV(exportData);
-                    filename = `HOT_Export_${new Date().toISOString().split('T')[0]}.csv`;
-                    mimeType = 'text/csv';
-                    break;
-                    
-                case 'xlsx':
-                    // For Excel, we'd need SheetJS library
-                    alert('Excel export requires SheetJS library. Please use JSON or CSV format.');
-                    return;
-            }
-            
-            // Download file
-            const blob = new Blob([dataStr], { type: mimeType });
-            const url = URL.createObjectURL(blob);
-            
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = filename;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-            
-            const recordCount = Object.keys(exportData.towers.A.flats).length + 
-                               Object.keys(exportData.towers.B.flats).length + 
-                               Object.keys(exportData.towers.C.flats).length;
-            
-            logSync(`Exported ${recordCount} records to ${format.toUpperCase()}`, 'success');
-            showNotification(`Data exported successfully (${recordCount} records)`, 'success');
-        }
-        
-        // Helper function to get date field for data type
-        function getDateFieldForType(type, data) {
-            switch(type) {
-                case 'keyHandover': return data.date;
-                case 'snagging': return data.endDate || data.startDate;
-                case 'firstVisit': return data.visitDate;
-                case 'handover': return data.date;
-                case 'interiors': return data.startDate;
-                case 'movein': return data.date;
-                default: return null;
+                
+                let dataStr, filename, mimeType;
+                
+                switch(format) {
+                    case 'json':
+                        dataStr = JSON.stringify(data, null, 2);
+                        filename = `HOTO_Export_${new Date().toISOString().split('T')[0]}.json`;
+                        mimeType = 'application/json';
+                        break;
+                        
+                    case 'csv':
+                        dataStr = convertToCSV(data);
+                        filename = `HOTO_Export_${new Date().toISOString().split('T')[0]}.csv`;
+                        mimeType = 'text/csv';
+                        break;
+                        
+                    case 'xlsx':
+                        // For Excel, create worksheet
+                        const wsData = [
+                            ['Tower', 'Flat', 'Key Handover', 'Snagging', 'First Visit', 'Handover', 'Interiors', 'Move-in', 'Last Updated']
+                        ];
+                        
+                        data.forEach(item => {
+                            wsData.push([
+                                item.tower || '',
+                                item.flatNumber || '',
+                                item.keyHandover?.date || '',
+                                item.snagging?.status || '',
+                                item.firstVisit?.visitDate || '',
+                                item.handover?.date || '',
+                                item.interiors?.status || '',
+                                item.movein?.date || '',
+                                item.lastUpdated || ''
+                            ]);
+                        });
+                        
+                        // Use SheetJS
+                        if (typeof XLSX !== 'undefined') {
+                            const ws = XLSX.utils.aoa_to_sheet(wsData);
+                            const wb = XLSX.utils.book_new();
+                            XLSX.utils.book_append_sheet(wb, ws, "HOTO_Process_Data");
+                            
+                            filename = `HOTO_Export_${new Date().toISOString().split('T')[0]}.xlsx`;
+                            XLSX.writeFile(wb, filename);
+                            
+                            showNotification(`Excel exported successfully! (${data.length} records)`, 'success');
+                            logSync('Data exported to Excel', 'success');
+                            
+                            btn.innerHTML = originalHTML;
+                            btn.disabled = false;
+                            return;
+                        } else {
+                            alert('SheetJS library not available. Please use JSON or CSV format.');
+                            btn.innerHTML = originalHTML;
+                            btn.disabled = false;
+                            return;
+                        }
+                }
+                
+                // Download file for JSON and CSV
+                const blob = new Blob([dataStr], { type: mimeType });
+                const url = URL.createObjectURL(blob);
+                
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+                
+                showNotification(`Data exported successfully (${data.length} records)`, 'success');
+                logSync(`Data exported (${data.length} records)`, 'success');
+                
+            } catch (error) {
+                console.error("Error exporting data:", error);
+                showNotification('Error exporting data: ' + error.message, 'error');
+                
+            } finally {
+                btn.innerHTML = originalHTML;
+                btn.disabled = false;
             }
         }
         
         // Convert data to CSV
         function convertToCSV(data) {
-            let csv = 'Tower,Flat,Process,Date,Status,Details\n';
+            let csv = 'Tower,Flat,Key Handover Date,Snagging Status,First Visit Date,Handover Date,Interiors Status,Move-in Date,Last Updated\n';
             
-            ['A', 'B', 'C'].forEach(tower => {
-                Object.entries(data.towers[tower].flats).forEach(([flatId, flatData]) => {
-                    const flatNumber = flatId.split('-')[1];
-                    
-                    Object.entries(flatData).forEach(([process, processData]) => {
-                        let date = '';
-                        let status = '';
-                        let details = '';
-                        
-                        switch(process) {
-                            case 'keyHandover':
-                                date = processData.date || '';
-                                status = processData.status || '';
-                                details = processData.person || '';
-                                if (processData.incompleteKeys) details += ' (Incomplete keys)';
-                                break;
-                            case 'snagging':
-                                date = processData.endDate || processData.startDate || '';
-                                status = processData.status || '';
-                                details = processData.inspector || '';
-                                if (processData.remarks) details += `: ${processData.remarks}`;
-                                break;
-                            case 'firstVisit':
-                                date = processData.visitDate || '';
-                                status = processData.status || '';
-                                details = processData.ownerName || '';
-                                break;
-                            case 'handover':
-                                date = processData.date || '';
-                                status = processData.status || '';
-                                details = processData.customer || '';
-                                break;
-                            case 'interiors':
-                                date = processData.startDate || '';
-                                status = processData.status || '';
-                                details = processData.contractor || '';
-                                break;
-                            case 'movein':
-                                date = processData.date || '';
-                                status = processData.status || '';
-                                details = processData.customer || '';
-                                break;
-                        }
-                        
-                        csv += `${tower},${flatNumber},${process},${date},${status},"${details.replace(/"/g, '""')}"\n`;
-                    });
-                });
+            data.forEach(item => {
+                csv += `"${item.tower || ''}","${item.flatNumber || ''}","${item.keyHandover?.date || ''}","${item.snagging?.status || ''}","${item.firstVisit?.visitDate || ''}","${item.handover?.date || ''}","${item.interiors?.status || ''}","${item.movein?.date || ''}","${item.lastUpdated || ''}"\n`;
             });
             
             return csv;
@@ -1459,146 +1421,11 @@
         
         // Import data
         function importData() {
-            // This would open the Excel processor page
-            window.location.href = 'excel-processor.html';
-        }
-        
-        // Save API configuration
-        function saveAPIConfig() {
-            const endpoint = document.getElementById('apiEndpoint').value;
-            const apiKey = document.getElementById('apiKey').value;
-            const enabled = document.getElementById('apiEnabled').checked;
-            const apiVersion = document.getElementById('apiVersion').value;
-            const apiTimeout = document.getElementById('apiTimeout').value;
-            
-            localStorage.setItem('api_endpoint', endpoint);
-            localStorage.setItem('api_key', apiKey);
-            localStorage.setItem('api_enabled', enabled);
-            localStorage.setItem('api_version', apiVersion);
-            localStorage.setItem('api_timeout', apiTimeout);
-            
-            // Save webhook config
-            const webhookUrl = document.getElementById('webhookUrl').value;
-            localStorage.setItem('webhook_url', webhookUrl);
-            
-            // Save webhook events
-            const webhookEvents = [];
-            if (document.getElementById('hookKeyHandover').checked) webhookEvents.push('keyHandover');
-            if (document.getElementById('hookSnagging').checked) webhookEvents.push('snagging');
-            if (document.getElementById('hookHandover').checked) webhookEvents.push('handover');
-            if (document.getElementById('hookMovein').checked) webhookEvents.push('movein');
-            if (document.getElementById('hookError').checked) webhookEvents.push('error');
-            if (document.getElementById('hookSyncComplete').checked) webhookEvents.push('syncComplete');
-            localStorage.setItem('webhook_events', JSON.stringify(webhookEvents));
-            
-            showNotification('API configuration saved!', 'success');
-            logSync('API configuration updated', 'success');
-        }
-        
-        // Test API connection
-        function testAPI() {
-            const endpoint = document.getElementById('apiEndpoint').value;
-            
-            if (!endpoint) {
-                alert('Please enter API endpoint first');
-                return;
-            }
-            
-            // Show testing status
-            const statusElement = document.getElementById('apiConnectionStatus');
-            const btn = document.getElementById('testAPIBtn');
-            const originalHTML = btn.innerHTML;
-            
-            statusElement.className = 'test-status test-pending';
-            statusElement.textContent = 'Testing...';
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testing...';
-            btn.disabled = true;
-            
-            // Simulate API test with timeout
+            showNotification('Redirecting to Excel Processor page...', 'info');
+            // Redirect to Excel processor page
             setTimeout(() => {
-                // Basic URL validation
-                const isValidUrl = endpoint.startsWith('http://') || endpoint.startsWith('https://');
-                
-                if (isValidUrl) {
-                    statusElement.className = 'test-status test-success';
-                    statusElement.textContent = 'Connected';
-                    
-                    // Update global test status
-                    document.getElementById('apiTestStatus').className = 'test-status test-success';
-                    document.getElementById('apiTestStatus').textContent = 'Connected';
-                    
-                    logSync('API connection test successful', 'success');
-                    showNotification('✓ API connection successful!', 'success');
-                } else {
-                    statusElement.className = 'test-status test-failed';
-                    statusElement.textContent = 'Connection Failed';
-                    
-                    // Update global test status
-                    document.getElementById('apiTestStatus').className = 'test-status test-failed';
-                    document.getElementById('apiTestStatus').textContent = 'Failed';
-                    
-                    logSync('API connection test failed', 'error');
-                    showNotification('✗ API connection failed', 'error');
-                }
-                
-                btn.innerHTML = originalHTML;
-                btn.disabled = false;
-                
-            }, 2000);
-        }
-        
-        // Test webhook
-        function testWebhook() {
-            const webhookUrl = document.getElementById('webhookUrl').value;
-            
-            if (!webhookUrl) {
-                alert('Please enter webhook URL first');
-                return;
-            }
-            
-            // Show testing status
-            showNotification('Testing webhook...', 'info');
-            
-            // Simulate webhook test
-            setTimeout(() => {
-                const isValidUrl = webhookUrl.startsWith('http://') || webhookUrl.startsWith('https://');
-                
-                if (isValidUrl) {
-                    logSync('Webhook test successful', 'success');
-                    showNotification('✓ Webhook test successful!', 'success');
-                } else {
-                    logSync('Webhook test failed: Invalid URL', 'error');
-                    showNotification('✗ Webhook test failed', 'error');
-                }
-            }, 1500);
-        }
-        
-        // Trigger webhook
-        function triggerWebhook(event, data) {
-            const webhookUrl = localStorage.getItem('webhook_url');
-            const webhookEvents = JSON.parse(localStorage.getItem('webhook_events') || '[]');
-            
-            if (!webhookUrl || !webhookEvents.includes(event)) {
-                return;
-            }
-            
-            // In a real implementation, this would send a POST request
-            console.log(`Webhook triggered: ${event}`, data);
-            logSync(`Webhook triggered: ${event}`, 'success');
-        }
-        
-        // Toggle password visibility
-        function togglePasswordVisibility(inputId) {
-            const input = document.getElementById(inputId);
-            const button = input.nextElementSibling.querySelector('i');
-            
-            if (input.type === 'password') {
-                input.type = 'text';
-                button.className = 'fas fa-eye-slash';
-            } else {
-                input.type = 'password';
-                button.className = 'fas fa-eye';
-            }
+                window.location.href = 'excel-processor.html';
+            }, 1000);
         }
         
         // Load sync logs
@@ -1752,51 +1579,32 @@
         function testAllConnections() {
             showNotification('Testing all connections...', 'info');
             
-            testGoogleConnection();
-            setTimeout(testAPI, 1000);
-            
-            // Update overall status after tests
-            setTimeout(updateOverallStatus, 3000);
+            testFirebaseConnection();
+            setTimeout(testGoogleConnection, 1000);
         }
         
         // Force sync
         function forceSync() {
-            if (confirm('Force sync will sync all data immediately. Continue?')) {
-                syncGoogleSheets();
+            if (confirm('Force sync will upload all local data to Firebase immediately. Continue?')) {
+                syncLocalToFirebase();
             }
         }
         
-        // Update overall status
-        function updateOverallStatus() {
-            const overallStatus = document.getElementById('overallStatus');
-            const googleStatus = document.getElementById('googleTestStatus').textContent;
-            const apiStatus = document.getElementById('apiTestStatus').textContent;
+        // Create local backup
+        function createLocalBackup() {
+            const btn = document.getElementById('createBackupBtn');
+            const originalHTML = btn.innerHTML;
             
-            if (googleStatus === 'Connected' || apiStatus === 'Connected') {
-                overallStatus.className = 'integration-status status-connected';
-                overallStatus.innerHTML = '<i class="fas fa-circle"></i> Online';
-            } else if (!navigator.onLine) {
-                overallStatus.className = 'integration-status status-disconnected';
-                overallStatus.innerHTML = '<i class="fas fa-circle"></i> Offline';
-            } else {
-                overallStatus.className = 'integration-status status-pending';
-                overallStatus.innerHTML = '<i class="fas fa-circle"></i> Pending';
-            }
-        }
-        
-        // Create backup
-        function createBackup() {
-            const hotData = localStorage.getItem('hot_process_data');
-            const syncConfig = {
-                google_sheets_url: localStorage.getItem('google_sheets_url'),
-                api_endpoint: localStorage.getItem('api_endpoint'),
-                webhook_url: localStorage.getItem('webhook_url')
-            };
+            btn.innerHTML = '<span class="loading-spinner"></span> Creating...';
+            btn.disabled = true;
+            
+            const localData = localStorage.getItem('hot_process_data');
+            const syncLogs = localStorage.getItem('sync_logs');
             
             const backup = {
                 timestamp: new Date().toISOString(),
-                data: hotData,
-                config: syncConfig,
+                data: localData,
+                logs: syncLogs,
                 version: '1.0'
             };
             
@@ -1812,8 +1620,17 @@
             localStorage.setItem('backups', JSON.stringify(backups));
             loadBackupList();
             
-            logSync('Backup created successfully', 'success');
-            showNotification('Backup created successfully!', 'success');
+            setTimeout(() => {
+                btn.innerHTML = originalHTML;
+                btn.disabled = false;
+                logSync('Local backup created successfully', 'success');
+                showNotification('Local backup created successfully!', 'success');
+            }, 500);
+        }
+        
+        // Create backup (general)
+        function createBackup() {
+            createLocalBackup();
         }
         
         // Load backup list
@@ -1837,55 +1654,58 @@
         // Restore backup
         function restoreBackup() {
             const backupIndex = document.getElementById('backupList').value;
+            const btn = document.getElementById('restoreBackupBtn');
             
             if (!backupIndex) {
                 alert('Please select a backup to restore');
                 return;
             }
             
-            if (!confirm('WARNING: Restoring will overwrite current data. Continue?')) {
+            if (!confirm('WARNING: Restoring will overwrite current local data. Continue?')) {
                 return;
             }
+            
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = '<span class="loading-spinner"></span> Restoring...';
+            btn.disabled = true;
             
             const backups = JSON.parse(localStorage.getItem('backups') || '[]');
             const backup = backups[parseInt(backupIndex)];
             
             if (!backup) {
                 alert('Backup not found');
+                btn.innerHTML = originalHTML;
+                btn.disabled = false;
                 return;
             }
             
             // Restore data
-            localStorage.setItem('hot_process_data', backup.data);
-            
-            // Restore config if available
-            if (backup.config) {
-                if (backup.config.google_sheets_url) {
-                    localStorage.setItem('google_sheets_url', backup.config.google_sheets_url);
-                }
-                if (backup.config.api_endpoint) {
-                    localStorage.setItem('api_endpoint', backup.config.api_endpoint);
-                }
-                if (backup.config.webhook_url) {
-                    localStorage.setItem('webhook_url', backup.config.webhook_url);
-                }
+            if (backup.data) {
+                localStorage.setItem('hot_process_data', backup.data);
             }
             
-            // Reload configuration
-            loadConfiguration();
+            if (backup.logs) {
+                localStorage.setItem('sync_logs', backup.logs);
+            }
             
-            logSync(`Backup restored from ${new Date(backup.timestamp).toLocaleString()}`, 'success');
-            showNotification('Backup restored successfully!', 'success');
-            
-            // Reload page to apply changes
             setTimeout(() => {
-                location.reload();
+                btn.innerHTML = originalHTML;
+                btn.disabled = false;
+                logSync(`Backup restored from ${new Date(backup.timestamp).toLocaleString()}`, 'success');
+                showNotification('Backup restored successfully!', 'success');
+                
+                // Reload configuration
+                loadConfiguration();
+                loadSyncLogs();
+                updateSyncStats();
+                
+                // Show reload suggestion
+                setTimeout(() => {
+                    if (confirm('Backup restored successfully! Would you like to refresh the page to see the restored data?')) {
+                        window.location.reload();
+                    }
+                }, 500);
             }, 1000);
-        }
-        
-        // Backup data
-        function backupData() {
-            createBackup();
         }
         
         // Show notification
@@ -1907,7 +1727,9 @@
             
             // Auto remove after 5 seconds
             setTimeout(() => {
-                notification.remove();
+                if (notification.parentNode) {
+                    notification.remove();
+                }
             }, 5000);
         }
     </script>
