@@ -8,6 +8,10 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js"></script>
     <style>
         :root {
             --cbre-blue: #1F3765;
@@ -147,6 +151,30 @@
     </style>
 </head>
 <body>
+    <!-- Firebase Configuration -->
+    <script>
+        // Initialize Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyBZoECRF1wzKzeqyJcaW2uAszbJylpeCkU",
+            authDomain: "hotoprocess.firebaseapp.com",
+            projectId: "hotoprocess",
+            storageBucket: "hotoprocess.firebasestorage.app",
+            messagingSenderId: "958524591846",
+            appId: "1:958524591846:web:b51c86974c212d01fe7527",
+            measurementId: "G-7KWHXLSP2J"
+        };
+        
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+        
+        // Initialize with anonymous auth
+        auth.signInAnonymously().catch(function(error) {
+            console.error("Auth error:", error);
+        });
+    </script>
+    
     <!-- Sidebar -->
     <div class="sidebar p-3">
         <div class="logo-display mb-4">
@@ -575,27 +603,21 @@
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // HOT System Configuration
-        const HOT_CONFIG = {
-            totalFlats: 939,
-            flatsPerTower: 313,
-            towers: ['A', 'B', 'C'],
-            googleScriptUrl: localStorage.getItem('google_script_url') || '',
-            apiEndpoints: {
-                save: 'https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec',
-                get: 'https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec'
-            }
-        };
-        
         // Global data store
         let hotData = {
             towers: {
-                A: { flats: {}, stats: {} },
-                B: { flats: {}, stats: {} },
-                C: { flats: {}, stats: {} }
+                A: { flats: {} },
+                B: { flats: {} },
+                C: { flats: {} }
             },
             summary: {},
             activities: []
+        };
+        
+        const HOT_CONFIG = {
+            totalFlats: 939,
+            flatsPerTower: 313,
+            towers: ['A', 'B', 'C']
         };
         
         // Initialize dashboard
@@ -603,12 +625,22 @@
             updateDateTime();
             loadData();
             initializeCharts();
+            setupRealTimeListener();
+            
             setInterval(updateDateTime, 60000);
             setInterval(checkSyncStatus, 30000);
-            
-            // Auto-refresh every 2 minutes
             setInterval(loadData, 120000);
         });
+        
+        // Setup real-time listener from Firebase
+        function setupRealTimeListener() {
+            // Listen for real-time updates
+            db.collection('hot_process')
+                .onSnapshot((snapshot) => {
+                    console.log("Real-time update received");
+                    loadData(); // Reload data when changes occur
+                });
+        }
         
         // Update date and time
         function updateDateTime() {
@@ -626,27 +658,62 @@
                 now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         }
         
-        // Load data from localStorage and Google Sheets
+        // Load data from Firebase
         async function loadData() {
-            // Load from localStorage
+            try {
+                // Get all documents from Firebase
+                const snapshot = await db.collection('hot_process').get();
+                
+                // Reset data structure
+                hotData = {
+                    towers: {
+                        A: { flats: {} },
+                        B: { flats: {} },
+                        C: { flats: {} }
+                    },
+                    summary: {},
+                    activities: []
+                };
+                
+                // Process Firebase documents
+                snapshot.forEach((doc) => {
+                    const data = doc.data();
+                    const tower = data.tower;
+                    const flatNumber = data.flatNumber;
+                    
+                    if (hotData.towers[tower]) {
+                        const flatId = `${tower}-${flatNumber}`;
+                        hotData.towers[tower].flats[flatId] = data;
+                    }
+                });
+                
+                // Save to localStorage as backup
+                localStorage.setItem('hot_process_data', JSON.stringify(hotData));
+                
+                // Calculate statistics
+                calculateStatistics();
+                
+                // Update UI
+                updateDashboard();
+                
+                // Update sync status
+                updateSyncStatus();
+                
+            } catch (error) {
+                console.error("Error loading data:", error);
+                // Fallback to localStorage
+                loadFromLocalStorage();
+            }
+        }
+        
+        // Load from localStorage as fallback
+        function loadFromLocalStorage() {
             const savedData = localStorage.getItem('hot_process_data');
             if (savedData) {
                 hotData = JSON.parse(savedData);
+                calculateStatistics();
+                updateDashboard();
             }
-            
-            // Try to sync with Google Sheets if online
-            if (navigator.onLine && HOT_CONFIG.googleScriptUrl) {
-                await syncWithGoogleSheets();
-            }
-            
-            // Calculate statistics
-            calculateStatistics();
-            
-            // Update UI
-            updateDashboard();
-            
-            // Update last sync time
-            updateSyncStatus();
         }
         
         // Calculate statistics from data
@@ -696,7 +763,7 @@
                             flat: flatId,
                             time: flatData.keyHandover.date,
                             person: flatData.keyHandover.person,
-                            description: `Key handover for Tower ${tower} - Flat ${flatId}`
+                            description: `Key handover for Tower ${tower} - Flat ${flatId.split('-')[1]}`
                         });
                     }
                     
@@ -705,7 +772,8 @@
                         summary.snagging++;
                         towerStats[tower].snagging++;
                         
-                        if (new Date(flatData.snagging.endDate).toDateString() === today) {
+                        if (flatData.snagging.endDate && 
+                            new Date(flatData.snagging.endDate).toDateString() === today) {
                             summary.today.snagging++;
                         }
                     }
@@ -737,12 +805,11 @@
                     }
                     
                     // Move-in
-                    if (flatData.interiors && flatData.interiors.moveInClearance) {
+                    if (flatData.movein && flatData.movein.status === 'completed') {
                         summary.moveins++;
                         towerStats[tower].moveins++;
                         
-                        if (flatData.interiors.moveInDate && 
-                            new Date(flatData.interiors.moveInDate).toDateString() === today) {
+                        if (new Date(flatData.movein.date).toDateString() === today) {
                             summary.today.moveins++;
                         }
                     }
@@ -794,6 +861,10 @@
             if (window.weeklyChart) {
                 updateChartWithRealData();
             }
+            
+            // Update sync time
+            document.getElementById('lastSyncTime').textContent = 
+                new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         }
         
         // Update progress bar
@@ -993,6 +1064,7 @@
         
         // Helper function to check if a date is in the current week
         function isDateInCurrentWeek(date, startOfWeek) {
+            if (!date) return false;
             const endOfWeek = new Date(startOfWeek);
             endOfWeek.setDate(startOfWeek.getDate() + 6);
             endOfWeek.setHours(23, 59, 59, 999);
@@ -1011,39 +1083,16 @@
         function updateChartWithRealData() {
             const weeklyData = getWeeklyProgressData();
             
-            window.weeklyChart.data.datasets[0].data = weeklyData.keyHandovers;
-            window.weeklyChart.data.datasets[1].data = weeklyData.handovers;
-            window.weeklyChart.update();
-        }
-        
-        // Sync with Google Sheets
-        async function syncWithGoogleSheets() {
-            if (!HOT_CONFIG.googleScriptUrl) return;
-            
-            try {
-                const response = await fetch(HOT_CONFIG.googleScriptUrl + '?action=get_dashboard_data');
-                const data = await response.json();
-                
-                if (data && data.summary) {
-                    // Merge Google Sheets data with local data
-                    hotData = mergeData(hotData, data);
-                    localStorage.setItem('hot_process_data', JSON.stringify(hotData));
-                }
-            } catch (error) {
-                console.error('Error syncing with Google Sheets:', error);
+            if (window.weeklyChart) {
+                window.weeklyChart.data.datasets[0].data = weeklyData.keyHandovers;
+                window.weeklyChart.data.datasets[1].data = weeklyData.handovers;
+                window.weeklyChart.update();
             }
-        }
-        
-        // Merge local and remote data
-        function mergeData(localData, remoteData) {
-            // Implementation depends on your data structure
-            return localData; // Placeholder
         }
         
         // Update sync status
         function updateSyncStatus() {
             const statusElement = document.getElementById('syncStatus');
-            const lastSyncElement = document.getElementById('lastSyncTime');
             
             if (navigator.onLine) {
                 statusElement.className = 'sync-status sync-online';
@@ -1052,26 +1101,11 @@
                 statusElement.className = 'sync-status sync-offline';
                 statusElement.innerHTML = '<i class="fas fa-exclamation-circle"></i> Offline';
             }
-            
-            const lastSync = localStorage.getItem('last_sync_time');
-            if (lastSync) {
-                lastSyncElement.textContent = new Date(lastSync).toLocaleTimeString();
-            }
         }
         
         // Check sync status periodically
         function checkSyncStatus() {
             updateSyncStatus();
-            
-            // Auto-sync if online and hasn't synced in last 5 minutes
-            if (navigator.onLine) {
-                const lastSync = localStorage.getItem('last_sync_time');
-                const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-                
-                if (!lastSync || new Date(lastSync) < fiveMinutesAgo) {
-                    syncWithGoogleSheets();
-                }
-            }
         }
         
         // Refresh dashboard
@@ -1083,8 +1117,7 @@
         // Sync all data
         async function syncAllData() {
             showNotification('Syncing all data...', 'info');
-            await syncWithGoogleSheets();
-            loadData();
+            await loadData();
             showNotification('Data synced successfully', 'success');
         }
         
@@ -1120,13 +1153,13 @@
                 Object.entries(flats).forEach(([flatId, flatData]) => {
                     const row = [
                         tower,
-                        flatId,
+                        flatId.split('-')[1],
                         flatData.keyHandover && flatData.keyHandover.status === 'completed' ? 'Yes' : 'No',
                         flatData.snagging && flatData.snagging.status === 'completed' ? 'Yes' : 'No',
                         flatData.firstVisit && flatData.firstVisit.status === 'completed' ? 'Yes' : 'No',
                         flatData.handover && flatData.handover.status === 'completed' ? 'Yes' : 'No',
                         flatData.interiors && flatData.interiors.status === 'started' ? 'Yes' : 'No',
-                        flatData.interiors && flatData.interiors.moveInClearance ? 'Yes' : 'No'
+                        flatData.movein && flatData.movein.status === 'completed' ? 'Yes' : 'No'
                     ];
                     data.push(row);
                 });
@@ -1150,24 +1183,28 @@
         function showAlerts() {
             // Check for pending snagging alerts
             let pendingAlerts = 0;
+            let alertMessage = '';
             
             HOT_CONFIG.towers.forEach(tower => {
                 const flats = hotData.towers[tower].flats;
                 Object.values(flats).forEach(flatData => {
                     if (flatData.snagging && flatData.snagging.status !== 'completed') {
-                        const endDate = new Date(flatData.snagging.endDate);
-                        const today = new Date();
-                        const daysDiff = Math.floor((today - endDate) / (1000 * 60 * 60 * 24));
-                        
-                        if (daysDiff >= 6) {
-                            pendingAlerts++;
+                        if (flatData.snagging.endDate) {
+                            const endDate = new Date(flatData.snagging.endDate);
+                            const today = new Date();
+                            const daysDiff = Math.floor((today - endDate) / (1000 * 60 * 60 * 24));
+                            
+                            if (daysDiff >= 6) {
+                                pendingAlerts++;
+                                alertMessage += `Tower ${tower} - Flat ${flatData.flatNumber}: ${daysDiff} days overdue\n`;
+                            }
                         }
                     }
                 });
             });
             
             if (pendingAlerts > 0) {
-                alert(`You have ${pendingAlerts} pending snagging alerts!`);
+                alert(`You have ${pendingAlerts} pending snagging alerts!\n\n${alertMessage}`);
             } else {
                 alert('No pending alerts.');
             }
