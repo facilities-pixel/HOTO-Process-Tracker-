@@ -182,6 +182,9 @@
                 <button class="btn btn-sm btn-outline-success w-100 mb-2" onclick="exportReport()">
                     <i class="fas fa-download"></i> Export Report
                 </button>
+                <button class="btn btn-sm btn-outline-info w-100 mb-2" onclick="exportToExcel()">
+                    <i class="fas fa-file-excel"></i> Export to Excel
+                </button>
                 <button class="btn btn-sm btn-outline-warning w-100" onclick="showAlerts()">
                     <i class="fas fa-bell"></i> View Alerts
                 </button>
@@ -323,6 +326,26 @@
                                 <div class="progress-bar" style="background: var(--cbre-light-blue); width: 0%" id="towerAHandoverBar"></div>
                             </div>
                         </div>
+                        <div class="mb-3">
+                            <small class="text-muted">Interiors Started</small>
+                            <div class="d-flex justify-content-between">
+                                <span id="towerAInteriors">0/313</span>
+                                <span id="towerAInteriorsPercent">0%</span>
+                            </div>
+                            <div class="progress progress-tower">
+                                <div class="progress-bar" style="background: var(--cbre-orange); width: 0%" id="towerAInteriorBar"></div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <small class="text-muted">Move-ins</small>
+                            <div class="d-flex justify-content-between">
+                                <span id="towerAMoveins">0/313</span>
+                                <span id="towerAMoveinsPercent">0%</span>
+                            </div>
+                            <div class="progress progress-tower">
+                                <div class="progress-bar" style="background: var(--cbre-purple); width: 0%" id="towerAMoveinBar"></div>
+                            </div>
+                        </div>
                         <div>
                             <small class="text-muted">Overall Progress</small>
                             <div class="d-flex justify-content-between">
@@ -377,6 +400,26 @@
                                 <div class="progress-bar" style="background: var(--cbre-light-blue); width: 0%" id="towerBHandoverBar"></div>
                             </div>
                         </div>
+                        <div class="mb-3">
+                            <small class="text-muted">Interiors Started</small>
+                            <div class="d-flex justify-content-between">
+                                <span id="towerBInteriors">0/313</span>
+                                <span id="towerBInteriorsPercent">0%</span>
+                            </div>
+                            <div class="progress progress-tower">
+                                <div class="progress-bar" style="background: var(--cbre-orange); width: 0%" id="towerBInteriorBar"></div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <small class="text-muted">Move-ins</small>
+                            <div class="d-flex justify-content-between">
+                                <span id="towerBMoveins">0/313</span>
+                                <span id="towerBMoveinsPercent">0%</span>
+                            </div>
+                            <div class="progress progress-tower">
+                                <div class="progress-bar" style="background: var(--cbre-purple); width: 0%" id="towerBMoveinBar"></div>
+                            </div>
+                        </div>
                         <div>
                             <small class="text-muted">Overall Progress</small>
                             <div class="d-flex justify-content-between">
@@ -429,6 +472,26 @@
                             </div>
                             <div class="progress progress-tower">
                                 <div class="progress-bar" style="background: var(--cbre-light-blue); width: 0%" id="towerCHandoverBar"></div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <small class="text-muted">Interiors Started</small>
+                            <div class="d-flex justify-content-between">
+                                <span id="towerCInteriors">0/313</span>
+                                <span id="towerCInteriorsPercent">0%</span>
+                            </div>
+                            <div class="progress progress-tower">
+                                <div class="progress-bar" style="background: var(--cbre-orange); width: 0%" id="towerCInteriorBar"></div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <small class="text-muted">Move-ins</small>
+                            <div class="d-flex justify-content-between">
+                                <span id="towerCMoveins">0/313</span>
+                                <span id="towerCMoveinsPercent">0%</span>
+                            </div>
+                            <div class="progress progress-tower">
+                                <div class="progress-bar" style="background: var(--cbre-purple); width: 0%" id="towerCMoveinBar"></div>
                             </div>
                         </div>
                         <div>
@@ -605,9 +668,9 @@
             };
             
             const towerStats = {
-                A: { keyHandovers: 0, snagging: 0, firstVisits: 0, handovers: 0 },
-                B: { keyHandovers: 0, snagging: 0, firstVisits: 0, handovers: 0 },
-                C: { keyHandovers: 0, snagging: 0, firstVisits: 0, handovers: 0 }
+                A: { keyHandovers: 0, snagging: 0, firstVisits: 0, handovers: 0, interiors: 0, moveins: 0 },
+                B: { keyHandovers: 0, snagging: 0, firstVisits: 0, handovers: 0, interiors: 0, moveins: 0 },
+                C: { keyHandovers: 0, snagging: 0, firstVisits: 0, handovers: 0, interiors: 0, moveins: 0 }
             };
             
             const today = new Date().toDateString();
@@ -667,9 +730,16 @@
                         }
                     }
                     
+                    // Interiors Started
+                    if (flatData.interiors && flatData.interiors.status === 'started') {
+                        summary.interiors++;
+                        towerStats[tower].interiors++;
+                    }
+                    
                     // Move-in
                     if (flatData.interiors && flatData.interiors.moveInClearance) {
                         summary.moveins++;
+                        towerStats[tower].moveins++;
                         
                         if (flatData.interiors.moveInDate && 
                             new Date(flatData.interiors.moveInDate).toDateString() === today) {
@@ -719,6 +789,11 @@
             
             // Update recent activities
             updateRecentActivities();
+            
+            // Update chart with real data
+            if (window.weeklyChart) {
+                updateChartWithRealData();
+            }
         }
         
         // Update progress bar
@@ -736,22 +811,30 @@
             document.getElementById(`tower${tower}Keys`).textContent = `${stats.keyHandovers}/${totalFlats}`;
             document.getElementById(`tower${tower}Snags`).textContent = `${stats.snagging}/${totalFlats}`;
             document.getElementById(`tower${tower}Handovers`).textContent = `${stats.handovers}/${totalFlats}`;
+            document.getElementById(`tower${tower}Interiors`).textContent = `${stats.interiors}/${totalFlats}`;
+            document.getElementById(`tower${tower}Moveins`).textContent = `${stats.moveins}/${totalFlats}`;
             
             // Update percentages
             const keyPercent = Math.round((stats.keyHandovers / totalFlats) * 100);
             const snagPercent = Math.round((stats.snagging / totalFlats) * 100);
             const handoverPercent = Math.round((stats.handovers / totalFlats) * 100);
-            const overallPercent = Math.round((keyPercent + snagPercent + handoverPercent) / 3);
+            const interiorPercent = Math.round((stats.interiors / totalFlats) * 100);
+            const moveinPercent = Math.round((stats.moveins / totalFlats) * 100);
+            const overallPercent = Math.round((keyPercent + snagPercent + handoverPercent + interiorPercent + moveinPercent) / 5);
             
             document.getElementById(`tower${tower}KeysPercent`).textContent = `${keyPercent}%`;
             document.getElementById(`tower${tower}SnagsPercent`).textContent = `${snagPercent}%`;
             document.getElementById(`tower${tower}HandoversPercent`).textContent = `${handoverPercent}%`;
+            document.getElementById(`tower${tower}InteriorsPercent`).textContent = `${interiorPercent}%`;
+            document.getElementById(`tower${tower}MoveinsPercent`).textContent = `${moveinPercent}%`;
             document.getElementById(`tower${tower}Overall`).textContent = `${overallPercent}%`;
             
             // Update progress bars
             document.getElementById(`tower${tower}KeyBar`).style.width = `${keyPercent}%`;
             document.getElementById(`tower${tower}SnagBar`).style.width = `${snagPercent}%`;
             document.getElementById(`tower${tower}HandoverBar`).style.width = `${handoverPercent}%`;
+            document.getElementById(`tower${tower}InteriorBar`).style.width = `${interiorPercent}%`;
+            document.getElementById(`tower${tower}MoveinBar`).style.width = `${moveinPercent}%`;
             document.getElementById(`tower${tower}OverallBar`).style.width = `${overallPercent}%`;
         }
         
@@ -796,9 +879,13 @@
             });
         }
         
-        // Initialize charts
+        // Initialize charts with real data
         function initializeCharts() {
             const ctx = document.getElementById('weeklyChart').getContext('2d');
+            
+            // Get initial weekly data
+            const weeklyData = getWeeklyProgressData();
+            
             window.weeklyChart = new Chart(ctx, {
                 type: 'line',
                 data: {
@@ -806,7 +893,7 @@
                     datasets: [
                         {
                             label: 'Key Handovers',
-                            data: [12, 19, 8, 15, 22, 18, 10],
+                            data: weeklyData.keyHandovers,
                             borderColor: '#80BBAD',
                             backgroundColor: 'rgba(128, 187, 173, 0.1)',
                             borderWidth: 3,
@@ -815,7 +902,7 @@
                         },
                         {
                             label: 'Handovers',
-                            data: [8, 12, 6, 14, 18, 15, 9],
+                            data: weeklyData.handovers,
                             borderColor: '#3E7CA6',
                             backgroundColor: 'rgba(62, 124, 166, 0.1)',
                             borderWidth: 3,
@@ -843,6 +930,90 @@
                     }
                 }
             });
+        }
+        
+        // Helper function to get weekly progress data from hotData
+        function getWeeklyProgressData() {
+            // Initialize weekly arrays for each day
+            const weeklyData = {
+                keyHandovers: [0, 0, 0, 0, 0, 0, 0],
+                handovers: [0, 0, 0, 0, 0, 0, 0],
+                snagging: [0, 0, 0, 0, 0, 0, 0]
+            };
+            
+            // Get today's date and calculate the start of the week (Monday)
+            const today = new Date();
+            const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
+            const startOfWeek = new Date(today);
+            startOfWeek.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+            startOfWeek.setHours(0, 0, 0, 0);
+            
+            // Process each tower's data
+            HOT_CONFIG.towers.forEach(tower => {
+                const flats = hotData.towers[tower].flats;
+                
+                Object.values(flats).forEach(flatData => {
+                    // Check key handovers
+                    if (flatData.keyHandover && flatData.keyHandover.status === 'completed') {
+                        const date = new Date(flatData.keyHandover.date);
+                        if (isDateInCurrentWeek(date, startOfWeek)) {
+                            const dayIndex = getDayIndex(date, startOfWeek);
+                            if (dayIndex >= 0 && dayIndex < 7) {
+                                weeklyData.keyHandovers[dayIndex]++;
+                            }
+                        }
+                    }
+                    
+                    // Check handovers
+                    if (flatData.handover && flatData.handover.status === 'completed') {
+                        const date = new Date(flatData.handover.date);
+                        if (isDateInCurrentWeek(date, startOfWeek)) {
+                            const dayIndex = getDayIndex(date, startOfWeek);
+                            if (dayIndex >= 0 && dayIndex < 7) {
+                                weeklyData.handovers[dayIndex]++;
+                            }
+                        }
+                    }
+                    
+                    // Check snagging completion
+                    if (flatData.snagging && flatData.snagging.status === 'completed') {
+                        const date = new Date(flatData.snagging.endDate);
+                        if (isDateInCurrentWeek(date, startOfWeek)) {
+                            const dayIndex = getDayIndex(date, startOfWeek);
+                            if (dayIndex >= 0 && dayIndex < 7) {
+                                weeklyData.snagging[dayIndex]++;
+                            }
+                        }
+                    }
+                });
+            });
+            
+            return weeklyData;
+        }
+        
+        // Helper function to check if a date is in the current week
+        function isDateInCurrentWeek(date, startOfWeek) {
+            const endOfWeek = new Date(startOfWeek);
+            endOfWeek.setDate(startOfWeek.getDate() + 6);
+            endOfWeek.setHours(23, 59, 59, 999);
+            
+            return date >= startOfWeek && date <= endOfWeek;
+        }
+        
+        // Helper function to get day index (0 = Monday, 6 = Sunday)
+        function getDayIndex(date, startOfWeek) {
+            const diffInMs = date - startOfWeek;
+            const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+            return diffInDays;
+        }
+        
+        // Function to update chart with real data
+        function updateChartWithRealData() {
+            const weeklyData = getWeeklyProgressData();
+            
+            window.weeklyChart.data.datasets[0].data = weeklyData.keyHandovers;
+            window.weeklyChart.data.datasets[1].data = weeklyData.handovers;
+            window.weeklyChart.update();
         }
         
         // Sync with Google Sheets
@@ -932,6 +1103,47 @@
             URL.revokeObjectURL(url);
             
             showNotification('Report exported successfully', 'success');
+        }
+        
+        // Export to Excel/CSV
+        function exportToExcel() {
+            // Convert data to worksheet format
+            const data = [];
+            
+            // Add header row
+            data.push(['Tower', 'Flat', 'Key Handover', 'Snagging', 'First Visit', 'Handover', 'Interiors Started', 'Move-in']);
+            
+            // Process each tower
+            HOT_CONFIG.towers.forEach(tower => {
+                const flats = hotData.towers[tower].flats;
+                
+                Object.entries(flats).forEach(([flatId, flatData]) => {
+                    const row = [
+                        tower,
+                        flatId,
+                        flatData.keyHandover && flatData.keyHandover.status === 'completed' ? 'Yes' : 'No',
+                        flatData.snagging && flatData.snagging.status === 'completed' ? 'Yes' : 'No',
+                        flatData.firstVisit && flatData.firstVisit.status === 'completed' ? 'Yes' : 'No',
+                        flatData.handover && flatData.handover.status === 'completed' ? 'Yes' : 'No',
+                        flatData.interiors && flatData.interiors.status === 'started' ? 'Yes' : 'No',
+                        flatData.interiors && flatData.interiors.moveInClearance ? 'Yes' : 'No'
+                    ];
+                    data.push(row);
+                });
+            });
+            
+            // Create worksheet
+            const ws = XLSX.utils.aoa_to_sheet(data);
+            
+            // Create workbook
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "HOTO_Process_Data");
+            
+            // Generate Excel file
+            const fileName = `HOTO_Report_${new Date().toISOString().split('T')[0]}.xlsx`;
+            XLSX.writeFile(wb, fileName);
+            
+            showNotification('Excel report exported successfully', 'success');
         }
         
         // Show alerts
