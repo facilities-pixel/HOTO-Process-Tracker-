@@ -96,9 +96,107 @@
         .template-card:hover {
             transform: translateY(-5px);
         }
+        
+        .validation-error {
+            border: 2px solid #dc3545 !important;
+            background-color: #f8d7da !important;
+        }
+        
+        .validation-success {
+            border: 2px solid #198754 !important;
+            background-color: #d4edda !important;
+        }
+        
+        .error-list {
+            max-height: 150px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+        
+        .step-indicator {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            position: relative;
+        }
+        
+        .step-indicator::before {
+            content: '';
+            position: absolute;
+            top: 15px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: #dee2e6;
+            z-index: 1;
+        }
+        
+        .step {
+            position: relative;
+            z-index: 2;
+            background: white;
+            padding: 0 10px;
+            text-align: center;
+        }
+        
+        .step-circle {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: #dee2e6;
+            color: #6c757d;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 5px;
+            font-weight: bold;
+        }
+        
+        .step.active .step-circle {
+            background: #0d6efd;
+            color: white;
+        }
+        
+        .step.completed .step-circle {
+            background: #198754;
+            color: white;
+        }
+        
+        .step-label {
+            font-size: 0.85rem;
+            color: #6c757d;
+        }
+        
+        .step.active .step-label {
+            color: #0d6efd;
+            font-weight: 500;
+        }
+        
+        .step.completed .step-label {
+            color: #198754;
+        }
     </style>
 </head>
 <body>
+    <!-- Sheet Selection Modal -->
+    <div class="modal fade" id="sheetModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Select Sheet to Import</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="sheetModalBody">
+                    <!-- Sheet options will be loaded here -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="loadSelectedSheet()">Load Selected Sheet</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="container-fluid py-4">
         <div class="row">
             <div class="col-lg-10 mx-auto">
@@ -115,8 +213,28 @@
                     </div>
                 </div>
                 
+                <!-- Step Indicator -->
+                <div class="step-indicator mb-4">
+                    <div class="step active" id="step1">
+                        <div class="step-circle">1</div>
+                        <div class="step-label">Upload File</div>
+                    </div>
+                    <div class="step" id="step2">
+                        <div class="step-circle">2</div>
+                        <div class="step-label">Preview Data</div>
+                    </div>
+                    <div class="step" id="step3">
+                        <div class="step-circle">3</div>
+                        <div class="step-label">Map Columns</div>
+                    </div>
+                    <div class="step" id="step4">
+                        <div class="step-circle">4</div>
+                        <div class="step-label">Import Progress</div>
+                    </div>
+                </div>
+                
                 <!-- Upload Area -->
-                <div class="card mb-4">
+                <div class="card mb-4" id="uploadCard">
                     <div class="card-header">
                         <h5 class="mb-0">Step 1: Upload Excel File</h5>
                     </div>
@@ -124,40 +242,69 @@
                         <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
                             <i class="fas fa-file-excel fa-4x text-success mb-3"></i>
                             <h4>Drop Excel file here or click to browse</h4>
-                            <p class="text-muted">Supports .xlsx, .xls, .csv files</p>
+                            <p class="text-muted">Supports .xlsx, .xls, .csv files (Max: 10MB)</p>
                             <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style="display: none;" onchange="handleFileSelect(event)">
                         </div>
                         
-                        <div class="mt-3">
-                            <p class="text-muted">Or paste Excel data directly:</p>
-                            <textarea id="excelPaste" class="form-control" rows="5" placeholder="Paste CSV data here..."></textarea>
-                            <button class="btn btn-secondary mt-2" onclick="parsePastedData()">
-                                <i class="fas fa-paste"></i> Parse Pasted Data
-                            </button>
+                        <div class="row mt-3">
+                            <div class="col-md-6">
+                                <p class="text-muted">Or paste Excel data directly:</p>
+                                <textarea id="excelPaste" class="form-control" rows="5" placeholder="Paste CSV data here..."></textarea>
+                                <button class="btn btn-secondary mt-2" onclick="parsePastedData()">
+                                    <i class="fas fa-paste"></i> Parse Pasted Data
+                                </button>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="alert alert-info">
+                                    <h6><i class="fas fa-info-circle"></i> File Requirements:</h6>
+                                    <ul class="mb-0">
+                                        <li>First row must contain headers</li>
+                                        <li>Supported columns: Tower, Flat, Date fields</li>
+                                        <li>Maximum file size: 10MB</li>
+                                        <li>Maximum rows: 10,000</li>
+                                        <li>Date format: YYYY-MM-DD or DD/MM/YYYY</li>
+                                    </ul>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
                 
                 <!-- Data Preview -->
                 <div class="card mb-4" id="previewCard" style="display: none;">
-                    <div class="card-header">
-                        <h5 class="mb-0">Step 2: Data Preview</h5>
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Step 2: Data Preview & Validation</h5>
+                        <span class="badge bg-info" id="validationSummary">0 errors found</span>
                     </div>
                     <div class="card-body">
+                        <div class="alert" id="validationAlert" style="display: none;"></div>
+                        
                         <div class="preview-table">
                             <table class="table table-bordered table-sm" id="previewTable">
                                 <!-- Preview will be loaded here -->
                             </table>
                         </div>
                         
-                        <div class="d-flex justify-content-between mt-3">
-                            <div>
-                                <span class="badge bg-info" id="rowCount">0 rows</span>
-                                <span class="badge bg-info ms-2" id="colCount">0 columns</span>
+                        <div class="mt-3">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <span class="badge bg-info" id="rowCount">0 rows</span>
+                                    <span class="badge bg-info ms-2" id="colCount">0 columns</span>
+                                    <span class="badge bg-warning ms-2" id="errorCount">0 errors</span>
+                                </div>
+                                <div>
+                                    <button class="btn btn-warning" onclick="validateData()">
+                                        <i class="fas fa-check-circle"></i> Validate Data
+                                    </button>
+                                    <button class="btn btn-primary ms-2" onclick="setupColumnMapping()">
+                                        <i class="fas fa-arrow-right"></i> Continue to Mapping
+                                    </button>
+                                </div>
                             </div>
-                            <button class="btn btn-primary" onclick="setupColumnMapping()">
-                                <i class="fas fa-arrow-right"></i> Continue to Mapping
-                            </button>
+                            
+                            <div class="error-list" id="errorList" style="display: none;">
+                                <!-- Error details will appear here -->
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -170,35 +317,64 @@
                     <div class="card-body">
                         <p class="text-muted">Map Excel columns to HOT Process System fields</p>
                         
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Select Data Type</label>
+                                    <select class="form-select" id="dataType" onchange="updateFieldOptions()">
+                                        <option value="key_handover">Key Handover Data</option>
+                                        <option value="snagging">Snagging Data</option>
+                                        <option value="first_visit">First Visit Data</option>
+                                        <option value="handover">Handover Data</option>
+                                        <option value="interiors">Interior Work Data</option>
+                                        <option value="movein">Move-in Data</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Import Strategy</label>
+                                    <select class="form-select" id="importStrategy">
+                                        <option value="add_new">Add new records only</option>
+                                        <option value="update_existing">Update existing records</option>
+                                        <option value="replace_all">Replace all data</option>
+                                        <option value="merge" selected>Merge with existing data</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        
                         <div class="mb-3">
-                            <label class="form-label">Select Data Type</label>
-                            <select class="form-select" id="dataType" onchange="updateFieldOptions()">
-                                <option value="key_handover">Key Handover Data</option>
-                                <option value="snagging">Snagging Data</option>
-                                <option value="first_visit">First Visit Data</option>
-                                <option value="handover">Handover Data</option>
-                                <option value="interiors">Interior Work Data</option>
-                                <option value="movein">Move-in Data</option>
-                            </select>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="createMissing" checked>
+                                <label class="form-check-label" for="createMissing">
+                                    Create missing flats automatically
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="validateDates" checked>
+                                <label class="form-check-label" for="validateDates">
+                                    Validate date formats
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="skipDuplicates" checked>
+                                <label class="form-check-label" for="skipDuplicates">
+                                    Skip duplicate records
+                                </label>
+                            </div>
                         </div>
                         
                         <div class="column-mapping" id="columnMapping">
                             <!-- Mapping will be generated here -->
                         </div>
                         
-                        <div class="form-check mt-3">
-                            <input class="form-check-input" type="checkbox" id="skipFirstRow" checked>
-                            <label class="form-check-label" for="skipFirstRow">
-                                Skip first row (header)
-                            </label>
-                        </div>
-                        
                         <div class="d-flex justify-content-between mt-4">
                             <button class="btn btn-secondary" onclick="backToPreview()">
                                 <i class="fas fa-arrow-left"></i> Back to Preview
                             </button>
-                            <button class="btn btn-success" onclick="importData()">
-                                <i class="fas fa-database"></i> Import Data
+                            <button class="btn btn-success" onclick="startImport()">
+                                <i class="fas fa-database"></i> Start Import
                             </button>
                         </div>
                     </div>
@@ -212,12 +388,39 @@
                     <div class="card-body">
                         <div class="progress-container">
                             <div class="d-flex justify-content-between mb-2">
-                                <span>Importing data...</span>
+                                <span id="importStatus">Preparing import...</span>
                                 <span id="importPercent">0%</span>
                             </div>
                             <div class="progress">
                                 <div class="progress-bar progress-bar-striped progress-bar-animated" 
                                      id="importProgress" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="row mt-3">
+                            <div class="col-md-4">
+                                <div class="card bg-light">
+                                    <div class="card-body text-center">
+                                        <h5 id="importedCount">0</h5>
+                                        <small class="text-muted">Imported</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card bg-light">
+                                    <div class="card-body text-center">
+                                        <h5 id="skippedCount">0</h5>
+                                        <small class="text-muted">Skipped</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card bg-light">
+                                    <div class="card-body text-center">
+                                        <h5 id="errorImportCount">0</h5>
+                                        <small class="text-muted">Errors</small>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         
@@ -229,6 +432,9 @@
                             <button class="btn btn-primary" id="completeBtn" style="display: none;" onclick="importComplete()">
                                 <i class="fas fa-check"></i> Import Complete
                             </button>
+                            <button class="btn btn-danger" id="cancelBtn" style="display: none;" onclick="cancelImport()">
+                                <i class="fas fa-times"></i> Cancel Import
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -239,7 +445,7 @@
                         <h5 class="mb-0">Excel Templates</h5>
                     </div>
                     <div class="card-body">
-                        <p class="text-muted">Download pre-formatted Excel templates:</p>
+                        <p class="text-muted">Download pre-formatted Excel templates for easy data entry:</p>
                         <div class="row g-3">
                             <!-- Key Handover Template -->
                             <div class="col-md-4">
@@ -325,6 +531,12 @@
                                 </div>
                             </div>
                         </div>
+                        
+                        <div class="alert alert-warning mt-3">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <strong>Important:</strong> When using templates, keep the column headers exactly as provided. 
+                            Only modify the data rows.
+                        </div>
                     </div>
                 </div>
             </div>
@@ -339,24 +551,30 @@
         let columnMapping = {};
         let importLog = [];
         let fieldOptions = {};
+        let validationErrors = [];
+        let isImporting = false;
+        let importCanceled = false;
+        let currentWorkbook = null;
         
         // Field options for each data type
         const fieldOptionsData = {
             key_handover: [
                 { value: '', label: '-- Ignore Column --' },
-                { value: 'tower', label: 'Tower (A, B, C)' },
-                { value: 'flat', label: 'Flat Number' },
-                { value: 'handover_person', label: 'Handover Person' },
-                { value: 'handover_date', label: 'Handover Date' },
+                { value: 'tower', label: 'Tower (A, B, C)', required: true },
+                { value: 'flat', label: 'Flat Number', required: true },
+                { value: 'handover_person', label: 'Handover Person', required: true },
+                { value: 'handover_date', label: 'Handover Date', required: true },
                 { value: 'incomplete_keys', label: 'Incomplete Keys (YES/NO)' },
-                { value: 'key_remarks', label: 'Key Remarks' }
+                { value: 'key_remarks', label: 'Key Remarks' },
+                { value: 'status', label: 'Status' },
+                { value: 'timestamp', label: 'Timestamp' }
             ],
             snagging: [
                 { value: '', label: '-- Ignore Column --' },
-                { value: 'tower', label: 'Tower (A, B, C)' },
-                { value: 'flat', label: 'Flat Number' },
-                { value: 'inspector', label: 'Inspector Name' },
-                { value: 'start_date', label: 'Start Date' },
+                { value: 'tower', label: 'Tower (A, B, C)', required: true },
+                { value: 'flat', label: 'Flat Number', required: true },
+                { value: 'inspector', label: 'Inspector Name', required: true },
+                { value: 'start_date', label: 'Start Date', required: true },
                 { value: 'end_date', label: 'End Date' },
                 { value: 'followup_date', label: 'Follow-up Date' },
                 { value: 'mep_completed', label: 'MEP Completed (YES/NO)' },
@@ -365,41 +583,49 @@
                 { value: 'water_completed', label: 'Water & Slopes Completed (YES/NO)' },
                 { value: 'ac_drain_completed', label: 'AC Drain Completed (YES/NO)' },
                 { value: 'tiles_completed', label: 'Tiles Completed (YES/NO)' },
-                { value: 'snag_remarks', label: 'Snag Remarks' }
+                { value: 'snag_remarks', label: 'Snag Remarks' },
+                { value: 'status', label: 'Status' },
+                { value: 'timestamp', label: 'Timestamp' }
             ],
             first_visit: [
                 { value: '', label: '-- Ignore Column --' },
-                { value: 'tower', label: 'Tower (A, B, C)' },
-                { value: 'flat', label: 'Flat Number' },
-                { value: 'owner_name', label: 'Owner Name' },
-                { value: 'owner_phone', label: 'Owner Phone' },
-                { value: 'visit_date', label: 'Visit Date & Time' },
-                { value: 'hot_member', label: 'HOT Team Member' },
+                { value: 'tower', label: 'Tower (A, B, C)', required: true },
+                { value: 'flat', label: 'Flat Number', required: true },
+                { value: 'owner_name', label: 'Owner Name', required: true },
+                { value: 'owner_phone', label: 'Owner Phone', required: true },
+                { value: 'visit_date', label: 'Visit Date & Time', required: true },
+                { value: 'hot_member', label: 'HOT Team Member', required: true },
                 { value: 'handover_suggested', label: 'Handover Date Suggested' },
                 { value: 'customer_remarks', label: 'Customer Remarks' },
-                { value: 'crm_noc', label: 'CRM NOC (YES/NO)' }
+                { value: 'crm_noc', label: 'CRM NOC (YES/NO)' },
+                { value: 'status', label: 'Status' },
+                { value: 'timestamp', label: 'Timestamp' }
             ],
             handover: [
                 { value: '', label: '-- Ignore Column --' },
-                { value: 'tower', label: 'Tower (A, B, C)' },
-                { value: 'flat', label: 'Flat Number' },
-                { value: 'customer_name', label: 'Customer Name' },
-                { value: 'handover_date', label: 'Handover Date & Time' },
-                { value: 'hoto_member', label: 'HOTO Team Member' },
+                { value: 'tower', label: 'Tower (A, B, C)', required: true },
+                { value: 'flat', label: 'Flat Number', required: true },
+                { value: 'customer_name', label: 'Customer Name', required: true },
+                { value: 'second_owner', label: 'Second Owner Name' },
+                { value: 'owner_email', label: 'Owner Email Address', required: true },
+                { value: 'second_owner_email', label: 'Second Owner Email' },
+                { value: 'hoto_member', label: 'HOTO Team Member', required: true },
+                { value: 'handover_date', label: 'Handover Date & Time', required: true },
                 { value: 'keys_handed', label: 'All Keys Handed (YES/NO)' },
                 { value: 'manual_handed', label: 'Handover Book Handed (YES/NO)' },
                 { value: 'gift_box_handed', label: 'Gift Box Handed (YES/NO)' },
                 { value: 'customer_feedback', label: 'Customer Feedback' },
-                { value: 'completed', label: 'Completed (YES/NO)' }
+                { value: 'status', label: 'Status' },
+                { value: 'timestamp', label: 'Timestamp' }
             ],
             interiors: [
                 { value: '', label: '-- Ignore Column --' },
-                { value: 'tower', label: 'Tower (A, B, C)' },
-                { value: 'flat', label: 'Flat Number' },
-                { value: 'start_date', label: 'Start Date' },
-                { value: 'contractor_name', label: 'Contractor Name' },
+                { value: 'tower', label: 'Tower (A, B, C)', required: true },
+                { value: 'flat', label: 'Flat Number', required: true },
+                { value: 'start_date', label: 'Start Date', required: true },
+                { value: 'end_date', label: 'Expected End Date' },
+                { value: 'contractor_name', label: 'Contractor Name', required: true },
                 { value: 'contractor_contact', label: 'Contractor Contact' },
-                { value: 'expected_end_date', label: 'Expected End Date' },
                 { value: 'clearance_by', label: 'Clearance By' },
                 { value: 'flooring', label: 'Flooring (YES/NO)' },
                 { value: 'painting', label: 'Painting (YES/NO)' },
@@ -407,16 +633,20 @@
                 { value: 'electrical', label: 'Electrical (YES/NO)' },
                 { value: 'plumbing', label: 'Plumbing (YES/NO)' },
                 { value: 'false_ceiling', label: 'False Ceiling (YES/NO)' },
-                { value: 'interior_remarks', label: 'Remarks' }
+                { value: 'interior_remarks', label: 'Remarks' },
+                { value: 'status', label: 'Status' },
+                { value: 'timestamp', label: 'Timestamp' }
             ],
             movein: [
                 { value: '', label: '-- Ignore Column --' },
-                { value: 'tower', label: 'Tower (A, B, C)' },
-                { value: 'flat', label: 'Flat Number' },
-                { value: 'customer_name', label: 'Customer Name' },
-                { value: 'movein_date', label: 'Move-in Date & Time' },
+                { value: 'tower', label: 'Tower (A, B, C)', required: true },
+                { value: 'flat', label: 'Flat Number', required: true },
+                { value: 'customer_name', label: 'Customer Name', required: true },
+                { value: 'movein_date', label: 'Move-in Date & Time', required: true },
                 { value: 'contact_number', label: 'Contact Number' },
-                { value: 'movein_remarks', label: 'Remarks/Special Instructions' }
+                { value: 'movein_remarks', label: 'Remarks/Special Instructions' },
+                { value: 'status', label: 'Status' },
+                { value: 'timestamp', label: 'Timestamp' }
             ]
         };
         
@@ -447,6 +677,25 @@
             fieldOptions = fieldOptionsData.key_handover;
         });
         
+        // Update step indicators
+        function updateStepIndicator(currentStep) {
+            // Reset all steps
+            for (let i = 1; i <= 4; i++) {
+                const step = document.getElementById(`step${i}`);
+                step.classList.remove('active', 'completed');
+            }
+            
+            // Set current step as active and previous steps as completed
+            for (let i = 1; i <= currentStep; i++) {
+                const step = document.getElementById(`step${i}`);
+                if (i === currentStep) {
+                    step.classList.add('active');
+                } else {
+                    step.classList.add('completed');
+                }
+            }
+        }
+        
         // Update field options based on selected data type
         function updateFieldOptions() {
             const dataType = document.getElementById('dataType').value;
@@ -463,14 +712,39 @@
             const file = event.target.files[0];
             if (!file) return;
             
+            // Check file size (max 10MB)
+            if (file.size > 10 * 1024 * 1024) {
+                alert('File size exceeds 10MB limit. Please use a smaller file.');
+                return;
+            }
+            
+            // Check file extension
+            const validExtensions = ['.xlsx', '.xls', '.csv'];
+            const fileExt = '.' + file.name.split('.').pop().toLowerCase();
+            if (!validExtensions.includes(fileExt)) {
+                alert('Please upload Excel (.xlsx, .xls) or CSV (.csv) files only.');
+                return;
+            }
+            
             const reader = new FileReader();
             
             reader.onload = function(e) {
-                const data = new Uint8Array(e.target.result);
-                const workbook = XLSX.read(data, { type: 'array' });
-                
-                // Show sheet selection
-                showSheetSelection(workbook);
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    
+                    // Store workbook globally
+                    currentWorkbook = workbook;
+                    
+                    // Show sheet selection
+                    showSheetSelection(workbook);
+                } catch (error) {
+                    alert('Error reading file: ' + error.message);
+                }
+            };
+            
+            reader.onerror = function() {
+                alert('Error reading file. Please try again.');
             };
             
             reader.readAsArrayBuffer(file);
@@ -483,40 +757,63 @@
             if (sheetNames.length === 1) {
                 loadSheetData(workbook, sheetNames[0]);
             } else {
-                let html = '<p>Select sheet to import:</p>';
+                // Populate modal with sheet options
+                const modalBody = document.getElementById('sheetModalBody');
+                let modalContent = '<p>Multiple sheets found. Select which sheet to import:</p>';
+                
                 sheetNames.forEach((sheetName, index) => {
-                    html += `
-                        <div class="form-check">
+                    const hasData = workbook.Sheets[sheetName]['!ref'] ? 'Has data' : 'Empty';
+                    modalContent += `
+                        <div class="form-check mb-2">
                             <input class="form-check-input" type="radio" name="sheetSelect" 
                                    value="${sheetName}" id="sheet${index}" ${index === 0 ? 'checked' : ''}>
                             <label class="form-check-label" for="sheet${index}">
-                                ${sheetName}
+                                ${sheetName} (${hasData})
                             </label>
                         </div>
                     `;
                 });
                 
-                html += `<button class="btn btn-primary mt-3" onclick="loadSelectedSheet(workbook)">
-                            Load Selected Sheet
-                         </button>`;
+                modalBody.innerHTML = modalContent;
                 
-                document.getElementById('uploadArea').innerHTML = html;
+                // Show modal
+                const modal = new bootstrap.Modal(document.getElementById('sheetModal'));
+                modal.show();
             }
         }
         
         // Load selected sheet
-        function loadSelectedSheet(workbook) {
+        function loadSelectedSheet() {
             const selectedSheet = document.querySelector('input[name="sheetSelect"]:checked').value;
-            loadSheetData(workbook, selectedSheet);
+            const modal = bootstrap.Modal.getInstance(document.getElementById('sheetModal'));
+            modal.hide();
+            loadSheetData(currentWorkbook, selectedSheet);
         }
         
         // Load sheet data
         function loadSheetData(workbook, sheetName) {
-            const worksheet = workbook.Sheets[sheetName];
-            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-            
-            excelData = jsonData;
-            showDataPreview(jsonData);
+            try {
+                const worksheet = workbook.Sheets[sheetName];
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+                
+                // Check if data is empty
+                if (!jsonData || jsonData.length === 0 || (jsonData.length === 1 && jsonData[0].length === 0)) {
+                    alert('Selected sheet is empty. Please choose another sheet.');
+                    return;
+                }
+                
+                // Check row limit
+                if (jsonData.length > 10000) {
+                    alert('File exceeds 10,000 row limit. Please use a smaller file.');
+                    return;
+                }
+                
+                excelData = jsonData;
+                showDataPreview(jsonData);
+                
+            } catch (error) {
+                alert('Error loading sheet data: ' + error.message);
+            }
         }
         
         // Show data preview
@@ -525,18 +822,31 @@
             
             const previewTable = document.getElementById('previewTable');
             const previewCard = document.getElementById('previewCard');
+            const uploadCard = document.getElementById('uploadCard');
             
             // Clear previous preview
             previewTable.innerHTML = '';
+            validationErrors = [];
             
-            // Show first 10 rows
-            const previewRows = Math.min(10, data.length);
+            // Show first 15 rows
+            const previewRows = Math.min(15, data.length);
             
-            for (let i = 0; i < previewRows; i++) {
+            // Create header row
+            const headerRow = document.createElement('tr');
+            for (let j = 0; j < data[0].length; j++) {
+                const th = document.createElement('th');
+                th.textContent = data[0][j] || `Column ${j+1}`;
+                th.title = `Column ${j+1}`;
+                headerRow.appendChild(th);
+            }
+            previewTable.appendChild(headerRow);
+            
+            // Create data rows
+            for (let i = 1; i < previewRows; i++) {
                 const row = document.createElement('tr');
                 
                 for (let j = 0; j < data[i].length; j++) {
-                    const cell = document.createElement(i === 0 ? 'th' : 'td');
+                    const cell = document.createElement('td');
                     cell.textContent = data[i][j] || '';
                     cell.title = `Row ${i+1}, Col ${j+1}`;
                     row.appendChild(cell);
@@ -548,10 +858,18 @@
             // Update counts
             document.getElementById('rowCount').textContent = `${data.length} rows`;
             document.getElementById('colCount').textContent = `${data[0] ? data[0].length : 0} columns`;
+            document.getElementById('errorCount').textContent = '0 errors';
             
-            // Show preview card
+            // Show preview card, hide upload card
+            uploadCard.style.display = 'none';
             previewCard.style.display = 'block';
             previewCard.scrollIntoView({ behavior: 'smooth' });
+            
+            // Update step indicator
+            updateStepIndicator(2);
+            
+            // Auto-validate
+            validateData();
         }
         
         // Parse pasted data
@@ -562,19 +880,191 @@
                 return;
             }
             
-            // Parse CSV
-            const rows = pasteData.split('\n').map(row => row.split(','));
-            excelData = rows;
-            showDataPreview(rows);
+            try {
+                // Parse CSV with proper handling of quotes and commas
+                const rows = [];
+                const lines = pasteData.split('\n');
+                
+                lines.forEach(line => {
+                    // Simple CSV parsing (for demo)
+                    const cells = line.split(',').map(cell => {
+                        // Remove surrounding quotes if present
+                        cell = cell.trim();
+                        if (cell.startsWith('"') && cell.endsWith('"')) {
+                            cell = cell.substring(1, cell.length - 1);
+                        }
+                        return cell;
+                    });
+                    rows.push(cells);
+                });
+                
+                // Check row limit
+                if (rows.length > 10000) {
+                    alert('Pasted data exceeds 10,000 row limit. Please paste smaller data.');
+                    return;
+                }
+                
+                excelData = rows;
+                showDataPreview(rows);
+                
+            } catch (error) {
+                alert('Error parsing pasted data: ' + error.message);
+            }
+        }
+        
+        // Validate data
+        function validateData() {
+            if (!excelData || excelData.length < 2) {
+                alert('No data to validate');
+                return;
+            }
+            
+            validationErrors = [];
+            const headers = excelData[0];
+            
+            // Check for required columns based on selected data type
+            const dataType = document.getElementById('dataType').value;
+            const requiredFields = fieldOptionsData[dataType].filter(f => f.required).map(f => f.value);
+            
+            // Validate each row
+            for (let i = 1; i < excelData.length; i++) {
+                const row = excelData[i];
+                const rowErrors = [];
+                
+                // Check for empty required fields
+                requiredFields.forEach(field => {
+                    const colIndex = headers.findIndex(h => h.toLowerCase().includes(field.toLowerCase()));
+                    if (colIndex !== -1 && (!row[colIndex] || row[colIndex].toString().trim() === '')) {
+                        rowErrors.push(`Missing ${field} in row ${i+1}`);
+                    }
+                });
+                
+                // Validate tower values
+                const towerIndex = headers.findIndex(h => h.toLowerCase().includes('tower'));
+                if (towerIndex !== -1 && row[towerIndex]) {
+                    const tower = row[towerIndex].toString().toUpperCase();
+                    if (!['A', 'B', 'C'].includes(tower)) {
+                        rowErrors.push(`Invalid tower value '${tower}' in row ${i+1}. Must be A, B, or C.`);
+                    }
+                }
+                
+                // Validate flat numbers
+                const flatIndex = headers.findIndex(h => h.toLowerCase().includes('flat'));
+                if (flatIndex !== -1 && row[flatIndex]) {
+                    const flat = row[flatIndex].toString();
+                    if (!/^\d+$/.test(flat)) {
+                        rowErrors.push(`Invalid flat number '${flat}' in row ${i+1}. Must be numeric.`);
+                    }
+                }
+                
+                // Validate date fields
+                headers.forEach((header, index) => {
+                    if (header.toLowerCase().includes('date') && row[index]) {
+                        const dateStr = row[index].toString();
+                        if (!isValidDate(dateStr)) {
+                            rowErrors.push(`Invalid date format '${dateStr}' in row ${i+1}, column '${header}'. Use YYYY-MM-DD or DD/MM/YYYY.`);
+                        }
+                    }
+                });
+                
+                if (rowErrors.length > 0) {
+                    validationErrors.push({
+                        row: i + 1,
+                        errors: rowErrors
+                    });
+                }
+            }
+            
+            // Update UI with validation results
+            updateValidationUI();
+        }
+        
+        // Check if date is valid
+        function isValidDate(dateString) {
+            // Try multiple date formats
+            const formats = [
+                /^\d{4}-\d{2}-\d{2}$/, // YYYY-MM-DD
+                /^\d{2}\/\d{2}\/\d{4}$/, // DD/MM/YYYY
+                /^\d{2}-\d{2}-\d{4}$/ // DD-MM-YYYY
+            ];
+            
+            return formats.some(format => format.test(dateString));
+        }
+        
+        // Update validation UI
+        function updateValidationUI() {
+            const errorCount = validationErrors.length;
+            const errorElement = document.getElementById('errorCount');
+            const validationAlert = document.getElementById('validationAlert');
+            const errorList = document.getElementById('errorList');
+            
+            errorElement.textContent = `${errorCount} errors`;
+            
+            if (errorCount === 0) {
+                errorElement.className = 'badge bg-success';
+                validationAlert.className = 'alert alert-success';
+                validationAlert.innerHTML = '<i class="fas fa-check-circle"></i> All data is valid!';
+                validationAlert.style.display = 'block';
+                errorList.style.display = 'none';
+            } else {
+                errorElement.className = 'badge bg-danger';
+                validationAlert.className = 'alert alert-danger';
+                validationAlert.innerHTML = `<i class="fas fa-exclamation-triangle"></i> Found ${errorCount} rows with errors. Please review before importing.`;
+                validationAlert.style.display = 'block';
+                
+                // Show error details
+                let errorHTML = '<h6>Error Details:</h6><ul class="mb-0">';
+                validationErrors.slice(0, 10).forEach(error => { // Show first 10 errors
+                    error.errors.forEach(err => {
+                        errorHTML += `<li>${err}</li>`;
+                    });
+                });
+                if (validationErrors.length > 10) {
+                    errorHTML += `<li>... and ${validationErrors.length - 10} more errors</li>`;
+                }
+                errorHTML += '</ul>';
+                
+                errorList.innerHTML = errorHTML;
+                errorList.style.display = 'block';
+                
+                // Highlight problematic rows in preview
+                highlightValidationErrors();
+            }
+        }
+        
+        // Highlight validation errors in preview table
+        function highlightValidationErrors() {
+            const table = document.getElementById('previewTable');
+            const rows = table.querySelectorAll('tr');
+            
+            // Reset all rows
+            rows.forEach(row => {
+                row.classList.remove('validation-error', 'validation-success');
+            });
+            
+            // Highlight rows with errors
+            validationErrors.forEach(error => {
+                if (error.row <= rows.length) {
+                    rows[error.row].classList.add('validation-error');
+                }
+            });
         }
         
         // Setup column mapping
         function setupColumnMapping() {
             if (!excelData || excelData.length < 1) return;
             
+            // Check if there are validation errors
+            if (validationErrors.length > 0) {
+                if (!confirm('There are validation errors. Do you want to continue anyway?')) {
+                    return;
+                }
+            }
+            
             const headers = excelData[0];
             const mappingDiv = document.getElementById('columnMapping');
             const mappingCard = document.getElementById('mappingCard');
+            const previewCard = document.getElementById('previewCard');
             
             // Clear previous mapping
             columnMapping = {};
@@ -582,6 +1072,11 @@
             let html = '<h6>Map Excel Columns:</h6>';
             
             headers.forEach((header, index) => {
+                const field = fieldOptions.find(f => 
+                    f.value && header.toLowerCase().includes(f.value.toLowerCase())
+                );
+                const defaultValue = field ? field.value : '';
+                
                 html += `
                     <div class="mapping-row">
                         <div class="excel-col">
@@ -592,7 +1087,9 @@
                             <select class="form-select form-select-sm" id="map_${index}" 
                                     onchange="updateColumnMapping(${index}, this.value)">
                                 ${fieldOptions.map(opt => 
-                                    `<option value="${opt.value}">${opt.label}</option>`
+                                    `<option value="${opt.value}" ${opt.value === defaultValue ? 'selected' : ''}>
+                                        ${opt.label} ${opt.required ? '*' : ''}
+                                    </option>`
                                 ).join('')}
                             </select>
                         </div>
@@ -602,9 +1099,23 @@
             
             mappingDiv.innerHTML = html;
             
-            // Show mapping card
+            // Initialize column mapping with detected values
+            headers.forEach((header, index) => {
+                const field = fieldOptions.find(f => 
+                    f.value && header.toLowerCase().includes(f.value.toLowerCase())
+                );
+                if (field) {
+                    columnMapping[index] = field.value;
+                }
+            });
+            
+            // Show mapping card, hide preview card
+            previewCard.style.display = 'none';
             mappingCard.style.display = 'block';
             mappingCard.scrollIntoView({ behavior: 'smooth' });
+            
+            // Update step indicator
+            updateStepIndicator(3);
         }
         
         // Update column mapping
@@ -615,53 +1126,78 @@
         // Back to preview
         function backToPreview() {
             document.getElementById('mappingCard').style.display = 'none';
-            document.getElementById('previewCard').scrollIntoView({ behavior: 'smooth' });
+            document.getElementById('previewCard').style.display = 'block';
+            updateStepIndicator(2);
         }
         
-        // Import data
-        function importData() {
+        // Start import
+        function startImport() {
             if (!excelData || excelData.length < 2) {
                 alert('No data to import');
                 return;
             }
             
-            // Get mapped columns
-            const mappedColumns = Object.keys(columnMapping).filter(key => columnMapping[key]);
+            // Check required mappings
+            const dataType = document.getElementById('dataType').value;
+            const requiredFields = fieldOptionsData[dataType].filter(f => f.required).map(f => f.value);
+            const mappedColumns = Object.values(columnMapping);
             
-            if (mappedColumns.length === 0) {
-                alert('Please map at least one column');
+            const missingRequired = requiredFields.filter(field => !mappedColumns.includes(field));
+            if (missingRequired.length > 0) {
+                alert(`Missing required field mappings: ${missingRequired.join(', ')}`);
                 return;
             }
             
             // Show progress card
+            document.getElementById('mappingCard').style.display = 'none';
             document.getElementById('progressCard').style.display = 'block';
             document.getElementById('progressCard').scrollIntoView({ behavior: 'smooth' });
             
-            // Start import
+            // Update step indicator
+            updateStepIndicator(4);
+            
+            // Start import process
             startImportProcess();
         }
         
         // Start import process
-        function startImportProcess() {
+        async function startImportProcess() {
+            if (!excelData || excelData.length < 2) return;
+            
+            isImporting = true;
+            importCanceled = false;
+            
             const dataType = document.getElementById('dataType').value;
-            const skipHeader = document.getElementById('skipFirstRow').checked;
+            const importStrategy = document.getElementById('importStrategy').value;
+            const skipHeader = true; // Always skip header row
             const startRow = skipHeader ? 1 : 0;
             const totalRows = excelData.length - startRow;
+            
             let processedRows = 0;
-            let successCount = 0;
+            let importedCount = 0;
+            let skippedCount = 0;
             let errorCount = 0;
             
             const importLogDiv = document.getElementById('importLog');
             importLogDiv.innerHTML = '';
             
+            // Show cancel button
+            document.getElementById('cancelBtn').style.display = 'inline-block';
+            
             // Process each row
             for (let i = startRow; i < excelData.length; i++) {
+                if (importCanceled) {
+                    logImport('Import canceled by user', 'warning');
+                    break;
+                }
+                
                 processedRows++;
                 const percent = Math.round((processedRows / totalRows) * 100);
                 
                 // Update progress
                 document.getElementById('importProgress').style.width = `${percent}%`;
                 document.getElementById('importPercent').textContent = `${percent}%`;
+                document.getElementById('importStatus').textContent = `Processing row ${processedRows} of ${totalRows}`;
                 
                 // Process row
                 const row = excelData[i];
@@ -675,151 +1211,228 @@
                 });
                 
                 // Import row
-                const result = importRowData(rowData, i + 1);
+                const result = await importRowData(rowData, i + 1, importStrategy);
                 
-                // Log result
-                const logEntry = document.createElement('div');
-                logEntry.className = result.success ? 'log-success' : 'log-error';
-                logEntry.textContent = `Row ${i + 1}: ${result.message}`;
-                importLogDiv.appendChild(logEntry);
-                
+                // Update counters
                 if (result.success) {
-                    successCount++;
+                    importedCount++;
+                } else if (result.skipped) {
+                    skippedCount++;
                 } else {
                     errorCount++;
                 }
                 
+                // Update counters display
+                document.getElementById('importedCount').textContent = importedCount;
+                document.getElementById('skippedCount').textContent = skippedCount;
+                document.getElementById('errorImportCount').textContent = errorCount;
+                
+                // Log result
+                const logEntry = document.createElement('div');
+                logEntry.className = result.success ? 'log-success' : 
+                                   result.skipped ? 'log-warning' : 'log-error';
+                logEntry.textContent = `Row ${i + 1}: ${result.message}`;
+                importLogDiv.appendChild(logEntry);
+                
                 // Scroll to bottom of log
                 importLogDiv.scrollTop = importLogDiv.scrollHeight;
+                
+                // Small delay to show progress (remove in production)
+                await new Promise(resolve => setTimeout(resolve, 10));
             }
             
-            // Show complete button
-            document.getElementById('completeBtn').style.display = 'block';
+            // Import complete
+            isImporting = false;
+            
+            // Hide cancel button, show complete button
+            document.getElementById('cancelBtn').style.display = 'none';
+            document.getElementById('completeBtn').style.display = 'inline-block';
             
             // Final log
             const finalLog = document.createElement('div');
             finalLog.className = 'log-success';
-            finalLog.innerHTML = `<strong>Import Complete:</strong> ${successCount} successful, ${errorCount} failed`;
+            finalLog.innerHTML = `<strong>Import Complete:</strong> ${importedCount} imported, ${skippedCount} skipped, ${errorCount} failed`;
             importLogDiv.appendChild(finalLog);
+            
+            document.getElementById('importStatus').textContent = 'Import Complete';
+            document.getElementById('importProgress').className = 'progress-bar bg-success';
         }
         
         // Import single row of data
-        function importRowData(rowData, rowNumber) {
+        async function importRowData(rowData, rowNumber, strategy) {
             try {
                 // Validate required fields
-                if (!rowData.tower || !rowData.flat) {
+                const dataType = rowData.data_type;
+                const requiredFields = fieldOptionsData[dataType].filter(f => f.required).map(f => f.value);
+                
+                for (const field of requiredFields) {
+                    if (!rowData[field]) {
+                        return {
+                            success: false,
+                            skipped: false,
+                            message: `Missing required field: ${field}`
+                        };
+                    }
+                }
+                
+                // Validate tower
+                if (rowData.tower && !['A', 'B', 'C'].includes(rowData.tower.toUpperCase())) {
                     return {
                         success: false,
-                        message: 'Missing tower or flat number'
+                        skipped: false,
+                        message: `Invalid tower: ${rowData.tower}`
+                    };
+                }
+                
+                // Validate flat number
+                if (rowData.flat && !/^\d+$/.test(rowData.flat.toString())) {
+                    return {
+                        success: false,
+                        skipped: false,
+                        message: `Invalid flat number: ${rowData.flat}`
                     };
                 }
                 
                 // Load existing data
                 let hotData = JSON.parse(localStorage.getItem('hot_process_data') || '{"towers":{"A":{"flats":{}},"B":{"flats":{}},"C":{"flats":{}}}}');
                 
-                const flatId = `${rowData.tower}-${rowData.flat}`;
+                const tower = rowData.tower.toUpperCase();
+                const flatId = `${tower}-${rowData.flat}`;
+                
+                // Check if flat already exists
+                const flatExists = hotData.towers[tower] && hotData.towers[tower].flats[flatId];
+                
+                // Apply import strategy
+                if (strategy === 'add_new' && flatExists) {
+                    return {
+                        success: false,
+                        skipped: true,
+                        message: `Skipped (flat already exists)`
+                    };
+                }
+                
+                if (strategy === 'update_existing' && !flatExists) {
+                    return {
+                        success: false,
+                        skipped: true,
+                        message: `Skipped (flat doesn't exist)`
+                    };
+                }
+                
+                if (strategy === 'replace_all') {
+                    // Clear existing data for this flat
+                    if (hotData.towers[tower]) {
+                        hotData.towers[tower].flats[flatId] = {};
+                    }
+                }
                 
                 // Initialize flat data if not exists
-                if (!hotData.towers[rowData.tower].flats[flatId]) {
-                    hotData.towers[rowData.tower].flats[flatId] = {};
+                if (!hotData.towers[tower]) {
+                    hotData.towers[tower] = { flats: {} };
+                }
+                if (!hotData.towers[tower].flats[flatId]) {
+                    hotData.towers[tower].flats[flatId] = {};
                 }
                 
                 // Import based on data type
-                switch(rowData.data_type) {
+                switch(dataType) {
                     case 'key_handover':
-                        hotData.towers[rowData.tower].flats[flatId].keyHandover = {
+                        hotData.towers[tower].flats[flatId].keyHandover = {
                             date: rowData.handover_date || new Date().toISOString().split('T')[0],
                             person: rowData.handover_person || '',
-                            incompleteKeys: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.incomplete_keys).toUpperCase()),
+                            incompleteKeys: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.incomplete_keys || '').toUpperCase()),
                             remarks: rowData.key_remarks || null,
-                            status: 'completed',
+                            status: rowData.status || 'completed',
                             imported: true,
                             importDate: new Date().toISOString()
                         };
                         break;
                         
                     case 'snagging':
-                        hotData.towers[rowData.tower].flats[flatId].snagging = {
+                        hotData.towers[tower].flats[flatId].snagging = {
                             startDate: rowData.start_date || new Date().toISOString().split('T')[0],
                             endDate: rowData.end_date || null,
                             inspector: rowData.inspector || '',
                             categories: {
-                                mep: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.mep_completed).toUpperCase()),
-                                civil: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.civil_completed).toUpperCase()),
-                                electrical: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.electrical_completed).toUpperCase()),
-                                water: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.water_completed).toUpperCase()),
-                                acDrain: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.ac_drain_completed).toUpperCase()),
-                                tiles: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.tiles_completed).toUpperCase())
+                                mep: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.mep_completed || '').toUpperCase()),
+                                civil: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.civil_completed || '').toUpperCase()),
+                                electrical: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.electrical_completed || '').toUpperCase()),
+                                water: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.water_completed || '').toUpperCase()),
+                                acDrain: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.ac_drain_completed || '').toUpperCase()),
+                                tiles: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.tiles_completed || '').toUpperCase())
                             },
                             remarks: rowData.snag_remarks || null,
                             followUpDate: rowData.followup_date || null,
-                            status: 'completed',
+                            status: rowData.status || 'completed',
                             imported: true,
                             importDate: new Date().toISOString()
                         };
                         break;
                         
                     case 'first_visit':
-                        hotData.towers[rowData.tower].flats[flatId].firstVisit = {
+                        hotData.towers[tower].flats[flatId].firstVisit = {
                             ownerName: rowData.owner_name || '',
                             ownerPhone: rowData.owner_phone || '',
                             visitDate: rowData.visit_date || new Date().toISOString(),
                             hotMember: rowData.hot_member || '',
                             remarks: rowData.customer_remarks || null,
                             handoverDateSuggested: rowData.handover_suggested || null,
-                            crmNOC: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.crm_noc).toUpperCase()),
-                            status: 'completed',
+                            crmNOC: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.crm_noc || '').toUpperCase()),
+                            status: rowData.status || 'completed',
                             imported: true,
                             importDate: new Date().toISOString()
                         };
                         break;
                         
                     case 'handover':
-                        hotData.towers[rowData.tower].flats[flatId].handover = {
+                        hotData.towers[tower].flats[flatId].handover = {
                             customer: rowData.customer_name || '',
+                            secondOwner: rowData.second_owner || null,
+                            ownerEmail: rowData.owner_email || '',
+                            secondOwnerEmail: rowData.second_owner_email || null,
                             hotMember: rowData.hoto_member || '',
                             date: rowData.handover_date || new Date().toISOString(),
                             documents: {
-                                keys: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.keys_handed).toUpperCase()),
-                                manual: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.manual_handed).toUpperCase()),
-                                amc: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.gift_box_handed).toUpperCase())
+                                keys: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.keys_handed || '').toUpperCase()),
+                                manual: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.manual_handed || '').toUpperCase()),
+                                amc: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.gift_box_handed || '').toUpperCase())
                             },
                             feedback: rowData.customer_feedback || null,
-                            status: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.completed).toUpperCase()) ? 'completed' : 'pending',
+                            status: rowData.status || 'completed',
                             imported: true,
                             importDate: new Date().toISOString()
                         };
                         break;
                         
                     case 'interiors':
-                        hotData.towers[rowData.tower].flats[flatId].interiors = {
+                        hotData.towers[tower].flats[flatId].interiors = {
                             startDate: rowData.start_date || new Date().toISOString().split('T')[0],
-                            endDate: rowData.expected_end_date || null,
+                            endDate: rowData.end_date || null,
                             contractor: rowData.contractor_name || '',
                             contractorContact: rowData.contractor_contact || null,
                             workTypes: {
-                                flooring: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.flooring).toUpperCase()),
-                                painting: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.painting).toUpperCase()),
-                                carpentry: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.carpentry).toUpperCase()),
-                                electrical: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.electrical).toUpperCase()),
-                                plumbing: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.plumbing).toUpperCase()),
-                                falseCeiling: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.false_ceiling).toUpperCase())
+                                flooring: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.flooring || '').toUpperCase()),
+                                painting: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.painting || '').toUpperCase()),
+                                carpentry: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.carpentry || '').toUpperCase()),
+                                electrical: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.electrical || '').toUpperCase()),
+                                plumbing: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.plumbing || '').toUpperCase()),
+                                falseCeiling: ['YES', 'TRUE', '1', 'Y'].includes(String(rowData.false_ceiling || '').toUpperCase())
                             },
                             clearanceBy: rowData.clearance_by || null,
                             remarks: rowData.interior_remarks || null,
-                            status: 'started',
+                            status: rowData.status || 'started',
                             imported: true,
                             importDate: new Date().toISOString()
                         };
                         break;
                         
                     case 'movein':
-                        hotData.towers[rowData.tower].flats[flatId].movein = {
+                        hotData.towers[tower].flats[flatId].movein = {
                             customer: rowData.customer_name || '',
                             date: rowData.movein_date || new Date().toISOString(),
                             contact: rowData.contact_number || null,
                             remarks: rowData.movein_remarks || null,
-                            status: 'completed',
+                            status: rowData.status || 'completed',
                             imported: true,
                             importDate: new Date().toISOString()
                         };
@@ -831,21 +1444,57 @@
                 
                 return {
                     success: true,
-                    message: `Imported ${rowData.data_type} for Tower ${rowData.tower} - Flat ${rowData.flat}`
+                    skipped: false,
+                    message: `Imported ${dataType} for Tower ${tower} - Flat ${rowData.flat}`
                 };
                 
             } catch (error) {
                 return {
                     success: false,
+                    skipped: false,
                     message: `Error: ${error.message}`
                 };
             }
         }
         
+        // Log import message
+        function logImport(message, type) {
+            const importLogDiv = document.getElementById('importLog');
+            const logEntry = document.createElement('div');
+            logEntry.className = type === 'success' ? 'log-success' : 
+                               type === 'warning' ? 'log-warning' : 'log-error';
+            logEntry.textContent = message;
+            importLogDiv.appendChild(logEntry);
+            importLogDiv.scrollTop = importLogDiv.scrollHeight;
+        }
+        
+        // Cancel import
+        function cancelImport() {
+            if (confirm('Are you sure you want to cancel the import?')) {
+                importCanceled = true;
+                isImporting = false;
+                logImport('Import canceled by user', 'warning');
+                document.getElementById('cancelBtn').style.display = 'none';
+                document.getElementById('completeBtn').style.display = 'inline-block';
+            }
+        }
+        
         // Import complete
         function importComplete() {
-            alert('Data import completed successfully!');
-            window.location.href = 'index.html';
+            const importedCount = parseInt(document.getElementById('importedCount').textContent);
+            const skippedCount = parseInt(document.getElementById('skippedCount').textContent);
+            const errorCount = parseInt(document.getElementById('errorImportCount').textContent);
+            
+            let message = `Import completed: ${importedCount} imported`;
+            if (skippedCount > 0) message += `, ${skippedCount} skipped`;
+            if (errorCount > 0) message += `, ${errorCount} errors`;
+            
+            alert(message);
+            
+            // Navigate back to dashboard
+            setTimeout(() => {
+                window.location.href = 'index.html';
+            }, 1000);
         }
         
         // Download template
@@ -856,60 +1505,96 @@
             switch(type) {
                 case 'key_handover':
                     templateData = [
-                        ['Tower', 'Flat', 'Handover_Person', 'Handover_Date', 'Incomplete_Keys', 'Remarks'],
-                        ['A', '1503', 'John Doe', '2023-10-15', 'NO', 'All keys received'],
-                        ['B', '2207', 'Jane Smith', '2023-10-16', 'YES', 'Missing main door key'],
-                        ['C', '0905', 'Mike Johnson', '2023-10-17', 'NO', 'All keys handed over']
+                        ['Tower', 'Flat', 'Handover_Person', 'Handover_Date', 'Incomplete_Keys', 'Remarks', 'Status'],
+                        ['A', '1503', 'John Doe', '2023-10-15', 'NO', 'All keys received', 'completed'],
+                        ['B', '2207', 'Jane Smith', '2023-10-16', 'YES', 'Missing main door key', 'completed'],
+                        ['C', '0905', 'Mike Johnson', '2023-10-17', 'NO', 'All keys handed over', 'completed'],
+                        ['', '', '', '', '', '', ''],
+                        ['Instructions:', '', '', '', '', '', ''],
+                        ['1. Fill in data starting from row 2', '', '', '', '', '', ''],
+                        ['2. Keep column headers exactly as shown', '', '', '', '', '', ''],
+                        ['3. Date format: YYYY-MM-DD', '', '', '', '', '', ''],
+                        ['4. Status: completed/pending/delayed', '', '', '', '', '', '']
                     ];
                     filename = 'key_handover_template.xlsx';
                     break;
                     
                 case 'snagging':
                     templateData = [
-                        ['Tower', 'Flat', 'Inspector', 'Start_Date', 'End_Date', 'Followup_Date', 'MEP_Completed', 'Civil_Completed', 'Electrical_Completed', 'Water_Completed', 'AC_Drain_Completed', 'Tiles_Completed', 'Remarks'],
-                        ['A', '1503', 'Mike Johnson', '2023-10-15', '2023-10-22', '2023-10-25', 'YES', 'YES', 'NO', 'YES', 'YES', 'YES', 'Electrical pending'],
-                        ['C', '0905', 'Sarah Wilson', '2023-10-16', '2023-10-23', '2023-10-26', 'YES', 'NO', 'YES', 'YES', 'YES', 'NO', 'Civil work needed'],
-                        ['B', '2207', 'Alex Chen', '2023-10-17', '2023-10-24', '2023-10-27', 'YES', 'YES', 'YES', 'YES', 'NO', 'YES', 'AC drain issues']
+                        ['Tower', 'Flat', 'Inspector', 'Start_Date', 'End_Date', 'Followup_Date', 'MEP_Completed', 'Civil_Completed', 'Electrical_Completed', 'Water_Completed', 'AC_Drain_Completed', 'Tiles_Completed', 'Remarks', 'Status'],
+                        ['A', '1503', 'Mike Johnson', '2023-10-15', '2023-10-22', '2023-10-25', 'YES', 'YES', 'NO', 'YES', 'YES', 'YES', 'Electrical pending', 'completed'],
+                        ['C', '0905', 'Sarah Wilson', '2023-10-16', '2023-10-23', '2023-10-26', 'YES', 'NO', 'YES', 'YES', 'YES', 'NO', 'Civil work needed', 'pending'],
+                        ['B', '2207', 'Alex Chen', '2023-10-17', '2023-10-24', '2023-10-27', 'YES', 'YES', 'YES', 'YES', 'NO', 'YES', 'AC drain issues', 'delayed'],
+                        ['', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+                        ['Instructions:', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+                        ['1. Fill in data starting from row 2', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+                        ['2. YES/NO fields: Use YES or NO only', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+                        ['3. Date format: YYYY-MM-DD', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+                        ['4. Status: completed/pending/delayed', '', '', '', '', '', '', '', '', '', '', '', '', '']
                     ];
                     filename = 'snagging_template.xlsx';
                     break;
                     
                 case 'first_visit':
                     templateData = [
-                        ['Tower', 'Flat', 'Owner_Name', 'Owner_Phone', 'Visit_Date', 'HOT_Member', 'Handover_Suggested', 'Customer_Remarks', 'CRM_NOC'],
-                        ['B', '2207', 'Robert Brown', '9876543210', '2023-10-20 14:30', 'Alex Chen', '2023-10-25 10:00', 'Customer satisfied', 'YES'],
-                        ['A', '1806', 'Emily Davis', '8765432109', '2023-10-21 11:00', 'Sam Wilson', '', 'Rescue flat - special handling', 'NO'],
-                        ['C', '0905', 'David Wilson', '7654321098', '2023-10-22 15:00', 'Lisa Wang', '2023-10-28 09:30', 'Minor issues noted', 'YES']
+                        ['Tower', 'Flat', 'Owner_Name', 'Owner_Phone', 'Visit_Date', 'HOT_Member', 'Handover_Suggested', 'Customer_Remarks', 'CRM_NOC', 'Status'],
+                        ['B', '2207', 'Robert Brown', '9876543210', '2023-10-20 14:30', 'Alex Chen', '2023-10-25 10:00', 'Customer satisfied', 'YES', 'completed'],
+                        ['A', '1806', 'Emily Davis', '8765432109', '2023-10-21 11:00', 'Sam Wilson', '', 'Rescue flat - special handling', 'NO', 'completed'],
+                        ['C', '0905', 'David Wilson', '7654321098', '2023-10-22 15:00', 'Lisa Wang', '2023-10-28 09:30', 'Minor issues noted', 'YES', 'completed'],
+                        ['', '', '', '', '', '', '', '', '', ''],
+                        ['Instructions:', '', '', '', '', '', '', '', '', ''],
+                        ['1. Fill in data starting from row 2', '', '', '', '', '', '', '', '', ''],
+                        ['2. Phone: 10-digit mobile number', '', '', '', '', '', '', '', '', ''],
+                        ['3. Date format: YYYY-MM-DD HH:MM', '', '', '', '', '', '', '', '', ''],
+                        ['4. CRM NOC: YES or NO', '', '', '', '', '', '', '', '', '']
                     ];
                     filename = 'first_visit_template.xlsx';
                     break;
                     
                 case 'handover':
                     templateData = [
-                        ['Tower', 'Flat', 'Customer_Name', 'Handover_Date', 'HOTO_Member', 'Keys_Handed', 'Manual_Handed', 'Gift_Box_Handed', 'Customer_Feedback', 'Completed'],
-                        ['A', '1503', 'Robert Brown', '2023-10-25 10:00', 'Alex Chen', 'YES', 'YES', 'YES', 'Very satisfied with the handover process', 'YES'],
-                        ['B', '2207', 'Emily Davis', '2023-10-26 11:00', 'Sam Wilson', 'YES', 'YES', 'NO', 'Gift box to be delivered next week', 'NO'],
-                        ['C', '0905', 'David Wilson', '2023-10-28 09:30', 'Lisa Wang', 'YES', 'YES', 'YES', 'All documents received', 'YES']
+                        ['Tower', 'Flat', 'Customer_Name', 'Second_Owner', 'Owner_Email', 'Second_Owner_Email', 'HOTO_Member', 'Handover_Date', 'Keys_Handed', 'Manual_Handed', 'Gift_Box_Handed', 'Customer_Feedback', 'Status'],
+                        ['A', '1503', 'Robert Brown', '', 'robert@email.com', '', 'Alex Chen', '2023-10-25 10:00', 'YES', 'YES', 'YES', 'Very satisfied with the handover process', 'completed'],
+                        ['B', '2207', 'Emily Davis', 'John Davis', 'emily@email.com', 'john@email.com', 'Sam Wilson', '2023-10-26 11:00', 'YES', 'YES', 'NO', 'Gift box to be delivered next week', 'pending'],
+                        ['C', '0905', 'David Wilson', '', 'david@email.com', '', 'Lisa Wang', '2023-10-28 09:30', 'YES', 'YES', 'YES', 'All documents received', 'completed'],
+                        ['', '', '', '', '', '', '', '', '', '', '', '', ''],
+                        ['Instructions:', '', '', '', '', '', '', '', '', '', '', '', ''],
+                        ['1. Fill in data starting from row 2', '', '', '', '', '', '', '', '', '', '', '', ''],
+                        ['2. Email: Valid email addresses', '', '', '', '', '', '', '', '', '', '', '', ''],
+                        ['3. Date format: YYYY-MM-DD HH:MM', '', '', '', '', '', '', '', '', '', '', '', ''],
+                        ['4. YES/NO fields: Use YES or NO only', '', '', '', '', '', '', '', '', '', '', '', '']
                     ];
                     filename = 'handover_template.xlsx';
                     break;
                     
                 case 'interiors':
                     templateData = [
-                        ['Tower', 'Flat', 'Start_Date', 'Contractor_Name', 'Contractor_Contact', 'Expected_End_Date', 'Clearance_By', 'Flooring', 'Painting', 'Carpentry', 'Electrical', 'Plumbing', 'False_Ceiling', 'Remarks'],
-                        ['A', '1503', '2023-10-30', 'Elite Interiors', '9876543210', '2023-11-30', 'Alex Chen', 'YES', 'YES', 'YES', 'NO', 'YES', 'NO', 'Electrical work will be done separately'],
-                        ['B', '2207', '2023-11-01', 'Premium Designs', '8765432109', '2023-12-15', 'Sam Wilson', 'YES', 'YES', 'YES', 'YES', 'YES', 'YES', 'Complete renovation'],
-                        ['C', '0905', '2023-11-05', 'Modern Interiors', '7654321098', '2023-12-10', 'Lisa Wang', 'NO', 'YES', 'NO', 'YES', 'NO', 'YES', 'Only painting and electrical work']
+                        ['Tower', 'Flat', 'Start_Date', 'End_Date', 'Contractor_Name', 'Contractor_Contact', 'Clearance_By', 'Flooring', 'Painting', 'Carpentry', 'Electrical', 'Plumbing', 'False_Ceiling', 'Remarks', 'Status'],
+                        ['A', '1503', '2023-10-30', '2023-11-30', 'Elite Interiors', '9876543210', 'Alex Chen', 'YES', 'YES', 'YES', 'NO', 'YES', 'NO', 'Electrical work will be done separately', 'started'],
+                        ['B', '2207', '2023-11-01', '2023-12-15', 'Premium Designs', '8765432109', 'Sam Wilson', 'YES', 'YES', 'YES', 'YES', 'YES', 'YES', 'Complete renovation', 'started'],
+                        ['C', '0905', '2023-11-05', '2023-12-10', 'Modern Interiors', '7654321098', 'Lisa Wang', 'NO', 'YES', 'NO', 'YES', 'NO', 'YES', 'Only painting and electrical work', 'started'],
+                        ['', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+                        ['Instructions:', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+                        ['1. Fill in data starting from row 2', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+                        ['2. Contact: 10-digit phone number', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+                        ['3. Date format: YYYY-MM-DD', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+                        ['4. YES/NO fields: Use YES or NO only', '', '', '', '', '', '', '', '', '', '', '', '', '', '']
                     ];
                     filename = 'interior_work_template.xlsx';
                     break;
                     
                 case 'movein':
                     templateData = [
-                        ['Tower', 'Flat', 'Customer_Name', 'Movein_Date', 'Contact_Number', 'Remarks'],
-                        ['A', '1503', 'Robert Brown', '2023-12-01 10:00', '9876543210', 'All furniture moved in'],
-                        ['B', '2207', 'Emily Davis', '2023-12-20 14:00', '8765432109', 'Rescue flat - special arrangements made'],
-                        ['C', '0905', 'David Wilson', '2023-12-15 09:00', '7654321098', 'Early morning move-in requested']
+                        ['Tower', 'Flat', 'Customer_Name', 'Movein_Date', 'Contact_Number', 'Remarks', 'Status'],
+                        ['A', '1503', 'Robert Brown', '2023-12-01 10:00', '9876543210', 'All furniture moved in', 'completed'],
+                        ['B', '2207', 'Emily Davis', '2023-12-20 14:00', '8765432109', 'Rescue flat - special arrangements made', 'completed'],
+                        ['C', '0905', 'David Wilson', '2023-12-15 09:00', '7654321098', 'Early morning move-in requested', 'completed'],
+                        ['', '', '', '', '', '', ''],
+                        ['Instructions:', '', '', '', '', '', ''],
+                        ['1. Fill in data starting from row 2', '', '', '', '', '', ''],
+                        ['2. Contact: 10-digit phone number', '', '', '', '', '', ''],
+                        ['3. Date format: YYYY-MM-DD HH:MM', '', '', '', '', '', ''],
+                        ['4. Status: completed/pending', '', '', '', '', '', '']
                     ];
                     filename = 'movein_template.xlsx';
                     break;
@@ -922,6 +1607,8 @@
             
             // Generate file
             XLSX.writeFile(workbook, filename);
+            
+            logImport(`Template downloaded: ${filename}`, 'success');
         }
     </script>
 </body>
