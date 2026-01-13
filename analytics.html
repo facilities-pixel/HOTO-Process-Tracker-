@@ -565,21 +565,25 @@
         // Check if real data exists
         function checkForData() {
             try {
-                const hotData = JSON.parse(localStorage.getItem('hot_process_data'));
-                const sampleData = localStorage.getItem('sample_data_loaded');
+                const hotData = getHOTData();
                 
-                // Check if there's real data (not just sample data)
+                // Reset flag
                 hasRealData = false;
                 
-                if (hotData) {
-                    // Check each tower for actual data
-                    ['A', 'B', 'C'].forEach(tower => {
-                        if (hotData.towers && hotData.towers[tower] && hotData.towers[tower].flats) {
+                if (hotData && hotData.towers) {
+                    // Check for any data in any tower
+                    Object.keys(hotData.towers).forEach(tower => {
+                        if (hotData.towers[tower] && hotData.towers[tower].flats) {
                             const flats = Object.values(hotData.towers[tower].flats);
                             if (flats.length > 0) {
-                                // Check if any flat has real data
+                                // Check if any flat has ANY data field (not just placeholder)
                                 flats.forEach(flat => {
-                                    if (flat.keyHandover || flat.snagging || flat.firstVisit || flat.handover) {
+                                    // Check for real data (not just empty objects or sample data)
+                                    if ((flat.keyHandover && flat.keyHandover.date) ||
+                                        (flat.snagging && (flat.snagging.status || flat.snagging.startDate)) ||
+                                        (flat.firstVisit && flat.firstVisit.visitDate) ||
+                                        (flat.handover && flat.handover.date) ||
+                                        (flat.interiors && flat.interiors.moveInDate)) {
                                         hasRealData = true;
                                     }
                                 });
@@ -628,6 +632,9 @@
                 return;
             }
             
+            // Check if we have data
+            checkForData();
+            
             // Load data from localStorage
             const hotData = getHOTData();
             
@@ -640,7 +647,7 @@
             // Create or update charts
             createCharts(currentStats);
             
-            // Update weekly table
+            // Update weekly table (fixed to show only relevant weeks)
             updateWeeklyTable(currentStats);
             
             // Show notification if no real data
@@ -663,7 +670,18 @@
                     };
                 }
                 
-                return JSON.parse(storedData);
+                const parsedData = JSON.parse(storedData);
+                
+                // Ensure data structure exists
+                if (!parsedData.towers) {
+                    parsedData.towers = {
+                        A: { flats: {} },
+                        B: { flats: {} },
+                        C: { flats: {} }
+                    };
+                }
+                
+                return parsedData;
                 
             } catch (error) {
                 console.error('Error loading data:', error);
@@ -677,7 +695,7 @@
             }
         }
         
-        // Calculate statistics from data
+        // Calculate statistics from data - FIXED VERSION
         function calculateStatistics(data, startDate, endDate) {
             const start = new Date(startDate);
             const end = new Date(endDate);
@@ -696,7 +714,7 @@
                     C: { keys: 0, snags: 0, visits: 0, handovers: 0, moveins: 0 }
                 },
                 snagStatus: { completed: 0, pending: 0, delayed: 0, not_started: 0 },
-                monthlyData: [],
+                monthlyData: { labels: [], keys: [], handovers: [] },
                 weeklyData: [],
                 timelineData: []
             };
@@ -704,30 +722,42 @@
             let totalSnagToHandoverDays = 0;
             let countSnagToHandover = 0;
             
-            // Process data
-            ['A', 'B', 'C'].forEach(tower => {
+            // Process data for ALL towers
+            Object.keys(data.towers).forEach(tower => {
                 const towerData = data.towers[tower];
                 if (towerData && towerData.flats) {
                     const flats = towerData.flats;
                     
                     Object.entries(flats).forEach(([flatId, flatData]) => {
-                        // Key handovers
+                        if (!flatData) return;
+                        
+                        // Key handovers - FIXED: Check for valid date
                         if (flatData.keyHandover && flatData.keyHandover.date) {
-                            const keyDate = new Date(flatData.keyHandover.date);
-                            if (keyDate >= start && keyDate <= end) {
-                                stats.keys++;
-                                stats.byTower[tower].keys++;
+                            try {
+                                const keyDate = new Date(flatData.keyHandover.date);
+                                if (!isNaN(keyDate) && keyDate >= start && keyDate <= end) {
+                                    stats.keys++;
+                                    stats.byTower[tower].keys = (stats.byTower[tower].keys || 0) + 1;
+                                }
+                            } catch (e) {
+                                console.log('Invalid date in keyHandover:', flatData.keyHandover.date);
                             }
                         }
                         
-                        // Snagging
+                        // Snagging - FIXED: Check for valid date
                         if (flatData.snagging) {
-                            const snagDate = flatData.snagging.startDate ? 
-                                new Date(flatData.snagging.startDate) : null;
+                            let snagDate = null;
                             
-                            if (snagDate && snagDate >= start && snagDate <= end) {
+                            // Try to get the most relevant date
+                            if (flatData.snagging.endDate) {
+                                snagDate = new Date(flatData.snagging.endDate);
+                            } else if (flatData.snagging.startDate) {
+                                snagDate = new Date(flatData.snagging.startDate);
+                            }
+                            
+                            if (snagDate && !isNaN(snagDate) && snagDate >= start && snagDate <= end) {
                                 stats.snags++;
-                                stats.byTower[tower].snags++;
+                                stats.byTower[tower].snags = (stats.byTower[tower].snags || 0) + 1;
                                 
                                 // Snag status
                                 if (flatData.snagging.completed === true) {
@@ -736,46 +766,63 @@
                                     stats.snagStatus.pending++;
                                 } else if (flatData.snagging.status === 'delayed') {
                                     stats.snagStatus.delayed++;
-                                } else {
+                                } else if (flatData.snagging.status === 'not_started') {
                                     stats.snagStatus.not_started++;
+                                } else {
+                                    // Default to pending if no status specified
+                                    stats.snagStatus.pending++;
                                 }
                                 
                                 // Calculate snag to handover time
                                 if (flatData.handover && flatData.handover.date) {
                                     const handoverDate = new Date(flatData.handover.date);
-                                    const daysDiff = Math.floor((handoverDate - snagDate) / (1000 * 60 * 60 * 24));
-                                    if (daysDiff > 0) {
-                                        totalSnagToHandoverDays += daysDiff;
-                                        countSnagToHandover++;
+                                    if (!isNaN(handoverDate) && !isNaN(snagDate) && handoverDate > snagDate) {
+                                        const daysDiff = Math.floor((handoverDate - snagDate) / (1000 * 60 * 60 * 24));
+                                        if (daysDiff > 0) {
+                                            totalSnagToHandoverDays += daysDiff;
+                                            countSnagToHandover++;
+                                        }
                                     }
                                 }
                             }
                         }
                         
-                        // First visits
+                        // First visits - FIXED: Check for valid date
                         if (flatData.firstVisit && flatData.firstVisit.visitDate) {
-                            const visitDate = new Date(flatData.firstVisit.visitDate);
-                            if (visitDate >= start && visitDate <= end) {
-                                stats.visits++;
-                                stats.byTower[tower].visits++;
+                            try {
+                                const visitDate = new Date(flatData.firstVisit.visitDate);
+                                if (!isNaN(visitDate) && visitDate >= start && visitDate <= end) {
+                                    stats.visits++;
+                                    stats.byTower[tower].visits = (stats.byTower[tower].visits || 0) + 1;
+                                }
+                            } catch (e) {
+                                console.log('Invalid date in firstVisit:', flatData.firstVisit.visitDate);
                             }
                         }
                         
-                        // Handovers
+                        // Handovers - FIXED: Check for valid date
                         if (flatData.handover && flatData.handover.date) {
-                            const handoverDate = new Date(flatData.handover.date);
-                            if (handoverDate >= start && handoverDate <= end) {
-                                stats.handovers++;
-                                stats.byTower[tower].handovers++;
+                            try {
+                                const handoverDate = new Date(flatData.handover.date);
+                                if (!isNaN(handoverDate) && handoverDate >= start && handoverDate <= end) {
+                                    stats.handovers++;
+                                    stats.byTower[tower].handovers = (stats.byTower[tower].handovers || 0) + 1;
+                                }
+                            } catch (e) {
+                                console.log('Invalid date in handover:', flatData.handover.date);
                             }
                         }
                         
-                        // Move-ins
+                        // Move-ins - FIXED: Check for valid date
                         if (flatData.interiors && flatData.interiors.moveInDate) {
-                            const moveInDate = new Date(flatData.interiors.moveInDate);
-                            if (moveInDate >= start && moveInDate <= end) {
-                                stats.moveins++;
-                                stats.byTower[tower].moveins++;
+                            try {
+                                const moveInDate = new Date(flatData.interiors.moveInDate);
+                                if (!isNaN(moveInDate) && moveInDate >= start && moveInDate <= end) {
+                                    stats.moveins++;
+                                    stats.byTower[tower].moveins = (stats.byTower[tower].moveins || 0) + 1;
+                                }
+                            } catch (e) {
+                                console.log('Invalid date in interiors:', flatData.interiors.moveInDate);
                             }
                         }
                     });
@@ -788,7 +835,11 @@
             
             // Generate monthly data for charts
             stats.monthlyData = generateMonthlyData(data, start, end);
+            
+            // Generate weekly data for table - FIXED: Show only weeks with data
             stats.weeklyData = generateWeeklyData(data, start, end);
+            
+            // Generate timeline data
             stats.timelineData = generateTimelineData(data, start, end);
             
             return stats;
@@ -802,6 +853,8 @@
             
             // Initialize all months in range
             const current = new Date(start);
+            current.setDate(1); // Start from first day of month
+            
             while (current <= end) {
                 const monthYear = current.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
                 monthlyMap[monthYear] = { keys: 0, handovers: 0 };
@@ -809,29 +862,37 @@
             }
             
             // Count actual data
-            ['A', 'B', 'C'].forEach(tower => {
+            Object.keys(data.towers).forEach(tower => {
                 const towerData = data.towers[tower];
                 if (towerData && towerData.flats) {
                     Object.values(towerData.flats).forEach(flatData => {
                         // Key handovers
                         if (flatData.keyHandover && flatData.keyHandover.date) {
-                            const date = new Date(flatData.keyHandover.date);
-                            if (date >= start && date <= end) {
-                                const monthKey = date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
-                                if (monthlyMap[monthKey]) {
-                                    monthlyMap[monthKey].keys++;
+                            try {
+                                const date = new Date(flatData.keyHandover.date);
+                                if (!isNaN(date) && date >= start && date <= end) {
+                                    const monthKey = date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+                                    if (monthlyMap[monthKey]) {
+                                        monthlyMap[monthKey].keys++;
+                                    }
                                 }
+                            } catch (e) {
+                                // Skip invalid dates
                             }
                         }
                         
                         // Handovers
                         if (flatData.handover && flatData.handover.date) {
-                            const date = new Date(flatData.handover.date);
-                            if (date >= start && date <= end) {
-                                const monthKey = date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
-                                if (monthlyMap[monthKey]) {
-                                    monthlyMap[monthKey].handovers++;
+                            try {
+                                const date = new Date(flatData.handover.date);
+                                if (!isNaN(date) && date >= start && date <= end) {
+                                    const monthKey = date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+                                    if (monthlyMap[monthKey]) {
+                                        monthlyMap[monthKey].handovers++;
+                                    }
                                 }
+                            } catch (e) {
+                                // Skip invalid dates
                             }
                         }
                     });
@@ -850,20 +911,36 @@
             };
         }
         
-        // Generate weekly data
+        // Generate weekly data - FIXED VERSION: Show only weeks with data
         function generateWeeklyData(data, startDate, endDate) {
             const weeklyData = [];
             const start = new Date(startDate);
             const end = new Date(endDate);
             
-            // Create weeks
-            let currentWeekStart = new Date(start);
-            let weekNumber = 1;
+            // Reset to start of week (Monday)
+            const startOfWeek = new Date(start);
+            const day = startOfWeek.getDay();
+            const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1); // Monday
+            startOfWeek.setDate(diff);
+            startOfWeek.setHours(0, 0, 0, 0);
             
-            while (currentWeekStart <= end) {
+            // Create weeks only for the date range (max 12 weeks to avoid showing too many)
+            let currentWeekStart = new Date(startOfWeek);
+            let weekNumber = 1;
+            const maxWeeks = 12; // Limit to max 12 weeks
+            
+            while (currentWeekStart <= end && weekNumber <= maxWeeks) {
                 const weekEnd = new Date(currentWeekStart);
                 weekEnd.setDate(weekEnd.getDate() + 6);
-                if (weekEnd > end) weekEnd = end;
+                weekEnd.setHours(23, 59, 59, 999);
+                
+                // Adjust weekEnd if it goes beyond selected end date
+                if (weekEnd > end) {
+                    weekEnd.setTime(end.getTime());
+                }
+                
+                // Skip if weekStart is after selected end date
+                if (currentWeekStart > end) break;
                 
                 // Count data for this week
                 let weekStats = {
@@ -872,72 +949,118 @@
                     visits: 0,
                     handovers: 0,
                     moveins: 0,
-                    avgTime: 0,
+                    totalActivities: 0,
                     efficiency: 0
                 };
                 
-                ['A', 'B', 'C'].forEach(tower => {
+                Object.keys(data.towers).forEach(tower => {
                     const towerData = data.towers[tower];
                     if (towerData && towerData.flats) {
                         Object.values(towerData.flats).forEach(flatData => {
+                            if (!flatData) return;
+                            
                             // Key handovers
                             if (flatData.keyHandover && flatData.keyHandover.date) {
-                                const date = new Date(flatData.keyHandover.date);
-                                if (date >= currentWeekStart && date <= weekEnd) {
-                                    weekStats.keys++;
-                                }
+                                try {
+                                    const date = new Date(flatData.keyHandover.date);
+                                    if (!isNaN(date) && date >= currentWeekStart && date <= weekEnd) {
+                                        weekStats.keys++;
+                                        weekStats.totalActivities++;
+                                    }
+                                } catch (e) {}
                             }
                             
                             // Snagging
-                            if (flatData.snagging && flatData.snagging.endDate) {
-                                const date = new Date(flatData.snagging.endDate);
-                                if (date >= currentWeekStart && date <= weekEnd) {
+                            if (flatData.snagging && (flatData.snagging.endDate || flatData.snagging.startDate)) {
+                                let snagDate = null;
+                                if (flatData.snagging.endDate) {
+                                    snagDate = new Date(flatData.snagging.endDate);
+                                } else if (flatData.snagging.startDate) {
+                                    snagDate = new Date(flatData.snagging.startDate);
+                                }
+                                
+                                if (snagDate && !isNaN(snagDate) && snagDate >= currentWeekStart && snagDate <= weekEnd) {
                                     weekStats.snags++;
+                                    weekStats.totalActivities++;
                                 }
                             }
                             
                             // First visits
                             if (flatData.firstVisit && flatData.firstVisit.visitDate) {
-                                const date = new Date(flatData.firstVisit.visitDate);
-                                if (date >= currentWeekStart && date <= weekEnd) {
-                                    weekStats.visits++;
-                                }
+                                try {
+                                    const date = new Date(flatData.firstVisit.visitDate);
+                                    if (!isNaN(date) && date >= currentWeekStart && date <= weekEnd) {
+                                        weekStats.visits++;
+                                        weekStats.totalActivities++;
+                                    }
+                                } catch (e) {}
                             }
                             
                             // Handovers
                             if (flatData.handover && flatData.handover.date) {
-                                const date = new Date(flatData.handover.date);
-                                if (date >= currentWeekStart && date <= weekEnd) {
-                                    weekStats.handovers++;
-                                }
+                                try {
+                                    const date = new Date(flatData.handover.date);
+                                    if (!isNaN(date) && date >= currentWeekStart && date <= weekEnd) {
+                                        weekStats.handovers++;
+                                        weekStats.totalActivities++;
+                                    }
+                                } catch (e) {}
                             }
                             
                             // Move-ins
                             if (flatData.interiors && flatData.interiors.moveInDate) {
-                                const date = new Date(flatData.interiors.moveInDate);
-                                if (date >= currentWeekStart && date <= weekEnd) {
-                                    weekStats.moveins++;
-                                }
+                                try {
+                                    const date = new Date(flatData.interiors.moveInDate);
+                                    if (!isNaN(date) && date >= currentWeekStart && date <= weekEnd) {
+                                        weekStats.moveins++;
+                                        weekStats.totalActivities++;
+                                    }
+                                } catch (e) {}
                             }
                         });
                     }
                 });
                 
-                // Calculate efficiency based on completion rate
-                const totalActivities = weekStats.keys + weekStats.snags + weekStats.visits + weekStats.handovers;
-                weekStats.efficiency = totalActivities > 0 ? 
-                    Math.min(100, Math.round((totalActivities / 50) * 100)) : 0;
+                // Calculate efficiency based on activity count
+                // Using a scale where 10+ activities per week = 100% efficiency
+                const maxExpectedActivities = 10;
+                weekStats.efficiency = weekStats.totalActivities > 0 ? 
+                    Math.min(100, Math.round((weekStats.totalActivities / maxExpectedActivities) * 100)) : 0;
                 
-                weeklyData.push({
-                    week: `Week ${weekNumber}`,
-                    ...weekStats
-                });
+                // Only add week if there's data or it's within the first 4 weeks
+                if (weekStats.totalActivities > 0 || weekNumber <= 4) {
+                    weeklyData.push({
+                        week: `W${weekNumber}`,
+                        weekStart: currentWeekStart.toISOString().split('T')[0],
+                        ...weekStats
+                    });
+                }
                 
+                // Move to next week
                 currentWeekStart.setDate(currentWeekStart.getDate() + 7);
+                currentWeekStart.setHours(0, 0, 0, 0);
                 weekNumber++;
             }
             
-            return weeklyData;
+            // Ensure we show at least 4 weeks even if no data
+            if (weeklyData.length < 4) {
+                for (let i = weeklyData.length; i < 4; i++) {
+                    weeklyData.push({
+                        week: `W${i + 1}`,
+                        weekStart: new Date(start.getTime() + (i * 7 * 24 * 60 * 60 * 1000)).toISOString().split('T')[0],
+                        keys: 0,
+                        snags: 0,
+                        visits: 0,
+                        handovers: 0,
+                        moveins: 0,
+                        totalActivities: 0,
+                        efficiency: 0
+                    });
+                }
+            }
+            
+            // Limit to first 8 weeks max
+            return weeklyData.slice(0, 8);
         }
         
         // Generate timeline data
@@ -946,10 +1069,12 @@
             const start = new Date(startDate);
             const end = new Date(endDate);
             
-            ['A', 'B', 'C'].forEach(tower => {
+            Object.keys(data.towers).forEach(tower => {
                 const towerData = data.towers[tower];
                 if (towerData && towerData.flats) {
                     Object.entries(towerData.flats).forEach(([flatId, flatData]) => {
+                        if (!flatData) return;
+                        
                         const timelineEntry = {
                             tower: tower,
                             flat: flatId,
@@ -964,8 +1089,12 @@
                         // Check if any date is within range
                         const hasDateInRange = Object.values(timelineEntry).some(val => {
                             if (!val) return false;
-                            const date = new Date(val);
-                            return date >= start && date <= end;
+                            try {
+                                const date = new Date(val);
+                                return !isNaN(date) && date >= start && date <= end;
+                            } catch (e) {
+                                return false;
+                            }
                         });
                         
                         if (hasDateInRange) {
@@ -995,11 +1124,11 @@
         // Update trend indicators
         function updateTrendIndicators(stats) {
             const trends = [
-                { id: 'keyTrend', current: stats.keys, previous: previousPeriodStats.keys },
-                { id: 'snagTrend', current: stats.snags, previous: previousPeriodStats.snags },
-                { id: 'visitTrend', current: stats.visits, previous: previousPeriodStats.visits },
-                { id: 'handoverTrend', current: stats.handovers, previous: previousPeriodStats.handovers },
-                { id: 'moveinTrend', current: stats.moveins, previous: previousPeriodStats.moveins }
+                { id: 'keyTrend', current: stats.keys, previous: previousPeriodStats.keys || 0 },
+                { id: 'snagTrend', current: stats.snags, previous: previousPeriodStats.snags || 0 },
+                { id: 'visitTrend', current: stats.visits, previous: previousPeriodStats.visits || 0 },
+                { id: 'handoverTrend', current: stats.handovers, previous: previousPeriodStats.handovers || 0 },
+                { id: 'moveinTrend', current: stats.moveins, previous: previousPeriodStats.moveins || 0 }
             ];
             
             trends.forEach(trend => {
@@ -1266,7 +1395,7 @@
             });
         }
         
-        // Update weekly table
+        // Update weekly table - FIXED: Shows only relevant weeks
         function updateWeeklyTable(stats) {
             const tableBody = document.getElementById('weeklyTable');
             const noDataRow = document.getElementById('weeklyNoData');
@@ -1295,13 +1424,13 @@
                 else if (weekData.efficiency > 0) efficiencyClass = 'bg-danger';
                 
                 row.innerHTML = `
-                    <td><strong>${weekData.week}</strong></td>
+                    <td><strong>${weekData.week}</strong><br><small class="text-muted">${weekData.weekStart}</small></td>
                     <td>${weekData.keys}</td>
                     <td>${weekData.snags}</td>
                     <td>${weekData.visits}</td>
                     <td>${weekData.handovers}</td>
                     <td>${weekData.moveins}</td>
-                    <td>${weekData.avgTime || 'N/A'}</td>
+                    <td>${currentStats.avgTime || 'N/A'}</td>
                     <td>
                         <span class="badge ${efficiencyClass} efficiency-badge">
                             ${weekData.efficiency}%
@@ -1512,14 +1641,14 @@ RECOMMENDATIONS:
             // Find critical alerts
             const criticalAlerts = [];
             
-            ['A', 'B', 'C'].forEach(tower => {
+            Object.keys(hotData.towers).forEach(tower => {
                 const towerData = hotData.towers[tower];
                 if (towerData && towerData.flats) {
                     Object.entries(towerData.flats).forEach(([flatId, flatData]) => {
                         // Check for snagging delays
                         if (flatData.snagging && flatData.snagging.status !== 'completed') {
                             const startDate = flatData.snagging.startDate ? new Date(flatData.snagging.startDate) : null;
-                            if (startDate) {
+                            if (startDate && !isNaN(startDate)) {
                                 const today = new Date();
                                 const daysSinceStart = Math.floor((today - startDate) / (1000 * 60 * 60 * 24));
                                 if (daysSinceStart > 7) {
@@ -1637,6 +1766,13 @@ RESOLUTION PLAN:
                 return;
             }
             
+            // Check if SheetJS is available
+            if (typeof XLSX === 'undefined') {
+                alert('SheetJS library not loaded. Please include the SheetJS library first.');
+                showNotification('SheetJS library not available', 'danger');
+                return;
+            }
+            
             // Get data from localStorage
             const data = getHOTData();
             
@@ -1645,11 +1781,11 @@ RESOLUTION PLAN:
                 ['Tower', 'Flat', 'Key Handover Date', 'Snagging Start', 'Snagging End', 'First Visit Date', 'Handover Date', 'Move-in Date', 'Status']
             ];
             
-            ['A', 'B', 'C'].forEach(tower => {
+            Object.keys(data.towers).forEach(tower => {
                 const towerData = data.towers[tower];
                 if (towerData && towerData.flats) {
                     Object.entries(towerData.flats).forEach(([flatId, flatData]) => {
-                        const flatNumber = flatId.split('-')[1];
+                        const flatNumber = flatId.split('-')[1] || flatId;
                         wsData.push([
                             tower,
                             flatNumber,
@@ -1665,12 +1801,6 @@ RESOLUTION PLAN:
                 }
             });
             
-            // Check if SheetJS is available
-            if (typeof XLSX === 'undefined') {
-                alert('SheetJS library not loaded. Cannot export Excel.');
-                return;
-            }
-            
             // Create worksheet and workbook
             const ws = XLSX.utils.aoa_to_sheet(wsData);
             const wb = XLSX.utils.book_new();
@@ -1684,11 +1814,12 @@ RESOLUTION PLAN:
         
         // Helper function to get overall status
         function getOverallStatus(flatData) {
-            if (flatData.movein) return 'Completed';
-            if (flatData.handover) return 'Handover Done';
-            if (flatData.firstVisit) return 'First Visit Done';
+            if (!flatData) return 'Not Started';
+            if (flatData.interiors?.moveInDate) return 'Completed';
+            if (flatData.handover?.date) return 'Handover Done';
+            if (flatData.firstVisit?.visitDate) return 'First Visit Done';
             if (flatData.snagging) return 'Snagging in Progress';
-            if (flatData.keyHandover) return 'Key Received';
+            if (flatData.keyHandover?.date) return 'Key Received';
             return 'Not Started';
         }
         
@@ -1702,11 +1833,11 @@ RESOLUTION PLAN:
             let csvContent = "Tower,Flat,Key Handover,Snagging,First Visit,Handover,Move-in,Status,Last Updated\n";
             
             const data = getHOTData();
-            ['A', 'B', 'C'].forEach(tower => {
+            Object.keys(data.towers).forEach(tower => {
                 const towerData = data.towers[tower];
                 if (towerData && towerData.flats) {
                     Object.entries(towerData.flats).forEach(([flatId, flatData]) => {
-                        const flatNumber = flatId.split('-')[1];
+                        const flatNumber = flatId.split('-')[1] || flatId;
                         const keyDate = flatData.keyHandover?.date || 'N/A';
                         const snagStatus = flatData.snagging?.status || 'N/A';
                         const visitDate = flatData.firstVisit?.visitDate || 'N/A';
