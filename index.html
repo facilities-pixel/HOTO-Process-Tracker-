@@ -1415,7 +1415,7 @@
                 </button>
                 <button class="control-btn" onclick="openTab('integration')" title="Google Sheets Integration">
                     <i class="fas fa-plug"></i>
-                    <span id="connectionIndicator" style="color: #dc3545;">●</span>
+                    <span id="connectionIndicator" style="color: #28a745;">●</span>
                 </button>
             </div>
         </header>
@@ -3182,8 +3182,8 @@
                     <div class="form-row">
                         <div class="form-group">
                             <label>Current Status:</label>
-                            <div id="connectionStatus" class="status-badge status-disconnected">
-                                <i class="fas fa-times-circle"></i> Not Connected
+                            <div id="connectionStatus" class="status-badge status-connected">
+                                <i class="fas fa-check-circle"></i> Connected
                             </div>
                         </div>
                         <div class="form-group">
@@ -3195,7 +3195,7 @@
                     <div class="form-row">
                         <div class="form-group">
                             <label>Local Records:</label>
-                            <div id="localRecordsCount">0 records</div>
+                            <div id="localRecordsCount">Calculating...</div>
                         </div>
                         <div class="form-group">
                             <label>Cloud Records:</label>
@@ -3254,7 +3254,7 @@
                         <h4><i class="fas fa-download"></i> Create Template</h4>
                         <p>Create a new Google Sheet with the required sheets or use our template:</p>
                         <button class="btn btn-primary" onclick="createGoogleSheetTemplate()">
-                            <i class="fab fa-google"></i> Create Google Sheet
+                            <i class="fab fa-google"></i> Open Google Sheets Template
                         </button>
                         <button class="btn btn-secondary" onclick="downloadSheetTemplate()">
                             <i class="fas fa-download"></i> Download Excel Template
@@ -3286,7 +3286,9 @@
                     <div class="form-group">
                         <label for="webAppCode">Google Apps Script Code:</label>
                         <textarea id="webAppCode" rows="15" readonly style="font-family: monospace; background: #f8f9fa; padding: 15px;">
-// SIMPLIFIED Google Apps Script for HOTO Process Tracker
+// Google Apps Script for HOTO Process Tracker - Updated with TEAM4 CRM
+const SHEET_NAMES = ['key_handover', 'snagging', 'first_visit', 'handover', 'interiors', 'movein', 'project_mep', 'team4_crm', 'cbre_crm'];
+
 function doGet(e) {
   return handleRequest(e);
 }
@@ -3296,73 +3298,245 @@ function doPost(e) {
 }
 
 function handleRequest(e) {
-  const action = e.parameter.action;
-  
-  // Create response
-  let response;
-  
-  switch(action) {
-    case 'ping':
-      response = {
-        status: 'online',
-        timestamp: new Date().toISOString(),
-        message: 'HOTO Process Tracker v3.0',
-        version: '3.0'
-      };
-      break;
-      
-    case 'test':
-      response = {
-        status: 'success',
-        message: 'Test successful! Your web app is working.',
-        timestamp: new Date().toISOString()
-      };
-      break;
-      
-    case 'get_data':
-      const process = e.parameter.process;
-      response = {
-        status: 'success',
-        process: process,
-        data: [],
-        count: 0,
-        message: 'Data retrieval is working'
-      };
-      break;
-      
-    case 'save_data':
-      const saveProcess = e.parameter.process;
-      response = {
-        status: 'success',
-        process: saveProcess,
-        action: 'saved',
-        message: 'Data saved successfully',
-        timestamp: new Date().toISOString()
-      };
-      break;
-      
-    default:
-      response = {
-        status: 'error',
-        message: 'Invalid action. Use "ping" to test connection.',
-        valid_actions: ['ping', 'test', 'get_data', 'save_data']
-      };
+  try {
+    const action = e.parameter.action;
+    const process = e.parameter.process;
+    const content = e.postData ? JSON.parse(e.postData.contents) : {};
+    
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    
+    // Handle CORS
+    const response = ContentService.createTextOutput();
+    response.setMimeType(ContentService.MimeType.JSON);
+    response.setHeader('Access-Control-Allow-Origin', '*');
+    
+    let data;
+    
+    switch(action) {
+      case 'get_data':
+        data = getData(ss, process);
+        break;
+      case 'save_data':
+        data = saveData(ss, process, content.data);
+        break;
+      case 'get_all_data':
+        data = getAllData(ss);
+        break;
+      case 'sync_all':
+        data = syncAllData(ss, content.data);
+        break;
+      case 'ping':
+        data = {status: 'online', timestamp: new Date().toISOString(), version: '3.0'};
+        break;
+      case 'get_stats':
+        data = getStatistics(ss);
+        break;
+      case 'get_flat_data':
+        data = getFlatData(ss, content.tower, content.flat, content.process);
+        break;
+      case 'get_dashboard_counts':
+        data = getDashboardCounts(ss);
+        break;
+      default:
+        data = {error: 'Invalid action', valid_actions: ['get_data', 'save_data', 'get_all_data', 'sync_all', 'ping', 'get_stats', 'get_flat_data', 'get_dashboard_counts']};
+    }
+    
+    response.setContent(JSON.stringify(data));
+    return response;
+    
+  } catch (error) {
+    Logger.log('Error: ' + error.toString());
+    const response = ContentService.createTextOutput(JSON.stringify({
+      error: error.toString(),
+      stack: error.stack
+    }));
+    response.setMimeType(ContentService.MimeType.JSON);
+    response.setHeader('Access-Control-Allow-Origin', '*');
+    return response;
   }
-  
-  // Return JSON response with CORS headers
-  return ContentService
-    .createTextOutput(JSON.stringify(response))
-    .setMimeType(ContentService.MimeType.JSON)
-    .setHeader('Access-Control-Allow-Origin', '*')
-    .setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-    .setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
-// Test function - run this in Apps Script editor first
-function testSetup() {
-  console.log('HOTO Process Tracker - Test Setup');
-  console.log('Spreadsheet URL: ' + SpreadsheetApp.getActiveSpreadsheet().getUrl());
-  return 'Setup test completed successfully';
+function getData(ss, process) {
+  if (!SHEET_NAMES.includes(process)) {
+    return {error: 'Invalid process name', valid_processes: SHEET_NAMES, data: []};
+  }
+  
+  const sheet = ss.getSheetByName(process);
+  if (!sheet) {
+    return {data: [], count: 0, message: `Sheet ${process} not found`};
+  }
+  
+  const data = getSheetData(sheet);
+  return {data: data, count: data.length, process: process};
+}
+
+function getAllData(ss) {
+  const allData = {};
+  SHEET_NAMES.forEach(process => {
+    const sheet = ss.getSheetByName(process);
+    if (sheet) {
+      allData[process] = getSheetData(sheet);
+    } else {
+      allData[process] = [];
+    }
+  });
+  
+  return allData;
+}
+
+function saveData(ss, process, rowData) {
+  if (!SHEET_NAMES.includes(process)) {
+    return {error: 'Invalid process name', valid_processes: SHEET_NAMES};
+  }
+  
+  let sheet = ss.getSheetByName(process);
+  if (!sheet) {
+    sheet = ss.insertSheet(process);
+    const headers = getHeadersForProcess(process);
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  }
+  
+  // Ensure headers exist
+  if (sheet.getLastRow() === 0) {
+    const headers = getHeadersForProcess(process);
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  }
+  
+  const data = getSheetData(sheet);
+  const existingIndex = data.findIndex(row => 
+    row.tower === rowData.tower && row.flat === rowData.flat);
+  
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  
+  if (existingIndex >= 0) {
+    // Update existing row
+    const rowNumber = existingIndex + 2; // +2 because of header row
+    const rowValues = headers.map(header => rowData[header] || '');
+    sheet.getRange(rowNumber, 1, 1, headers.length).setValues([rowValues]);
+    return {success: true, message: 'Data updated successfully', action: 'update'};
+  } else {
+    // Add new row
+    const rowValues = headers.map(header => rowData[header] || '');
+    sheet.appendRow(rowValues);
+    return {success: true, message: 'Data saved successfully', action: 'insert'};
+  }
+}
+
+function syncAllData(ss, allData) {
+  const results = {};
+  
+  SHEET_NAMES.forEach(process => {
+    if (allData[process]) {
+      results[process] = [];
+      
+      allData[process].forEach(rowData => {
+        const result = saveData(ss, process, rowData);
+        results[process].push(result);
+      });
+    }
+  });
+  
+  return {success: true, results: results, timestamp: new Date().toISOString()};
+}
+
+function getSheetData(sheet) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return [];
+  
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const dataRange = sheet.getRange(2, 1, lastRow - 1, headers.length);
+  const values = dataRange.getValues();
+  
+  return values.map(row => {
+    const obj = {};
+    headers.forEach((header, index) => {
+      obj[header] = row[index];
+    });
+    return obj;
+  });
+}
+
+function getHeadersForProcess(process) {
+  const headers = {
+    'key_handover': ['id', 'tower', 'flat', 'handover_person', 'received_by_cbre', 'handover_date', 'all_keys_not_handed', 'key_remarks', 'created_at', 'updated_at'],
+    'snagging': ['id', 'tower', 'flat', 'mep_inspector', 'mep_start_date', 'mep_end_date', 'mep_completed', 'civil_inspector', 'civil_start_date', 'civil_end_date', 'civil_completed', 'electrical_inspector', 'electrical_start_date', 'electrical_end_date', 'electrical_completed', 'water_inspector', 'water_start_date', 'water_end_date', 'water_completed', 'ac_drain_inspector', 'ac_drain_start_date', 'ac_drain_end_date', 'ac_drain_completed', 'tiles_inspector', 'tiles_start_date', 'tiles_end_date', 'tiles_completed', 'snag_remarks', 'followup_date', 'created_at', 'updated_at'],
+    'first_visit': ['id', 'tower', 'flat', 'owner_name', 'owner_phone', 'visit_datetime', 'hot_member', 'owner_will_inform_date', 'handover_suggested', 'going_for_third_party', 'third_party_date_confirmed', 'report_received_date', 'soft_copy', 'hard_copy', 'informed_to_project_team', 'project_team_informed_date', 'cbre_checking_done', 'cbre_checking_date', 'customer_remarks', 'crm_noc', 'created_at', 'updated_at'],
+    'handover': ['id', 'tower', 'flat', 'customer_name', 'customer_email', 'second_owner_name', 'second_owner_email', 'hoto_member', 'handover_datetime', 'items_handed', 'customer_feedback', 'final_inspection', 'inspection_remarks', 'created_at', 'updated_at'],
+    'interiors': ['id', 'tower', 'flat', 'site_supervisor', 'site_supervisor_number', 'contractor_name', 'contractor_contact', 'work_start_date', 'estimated_end_date', 'works_planned', 'dos_donts_explained', 'multiple_vendors', 'additional_vendors_json', 'remarks', 'created_at', 'updated_at'],
+    'movein': ['id', 'tower', 'flat', 'customer_name', 'contact_number', 'movein_date', 'movein_time', 'move_clearance_given', 'deviations_json', 'remarks', 'created_at', 'updated_at'],
+    'project_mep': ['id', 'tower', 'flat', 'snags_status', 'confirmation_date', 'cbre_checked', 'cbre_checked_date', 'created_at', 'updated_at'],
+    'team4_crm': ['id', 'tower', 'flat', 'action_type', 'assigned_to', 'start_date', 'registration_completed', 'noc_given_to_cbre', 'remarks', 'created_at', 'updated_at'],
+    'cbre_crm': ['id', 'tower', 'flat', 'description', 'informed_to', 'status', 'caller_name', 'caller_phone', 'followup_date', 'remarks', 'created_at', 'updated_at']
+  };
+  
+  return headers[process] || [];
+}
+
+function getStatistics(ss) {
+  const stats = {};
+  
+  SHEET_NAMES.forEach(process => {
+    const sheet = ss.getSheetByName(process);
+    if (sheet) {
+      const data = getSheetData(sheet);
+      stats[process] = {
+        count: data.length,
+        lastUpdated: sheet.getLastRow() > 1 ? 'Has data' : 'Empty'
+      };
+    } else {
+      stats[process] = {count: 0, lastUpdated: 'Sheet not found'};
+    }
+  });
+  
+  return stats;
+}
+
+function getFlatData(ss, tower, flat, process = null) {
+  const result = {};
+  
+  if (process) {
+    // Get data for specific process
+    if (!SHEET_NAMES.includes(process)) {
+      return {error: 'Invalid process name'};
+    }
+    
+    const sheet = ss.getSheetByName(process);
+    if (sheet) {
+      const data = getSheetData(sheet);
+      const flatData = data.filter(row => row.tower === tower && row.flat === flat);
+      result[process] = flatData.length > 0 ? flatData[0] : null;
+    }
+  } else {
+    // Get data for all processes
+    SHEET_NAMES.forEach(processName => {
+      const sheet = ss.getSheetByName(processName);
+      if (sheet) {
+        const data = getSheetData(sheet);
+        const flatData = data.filter(row => row.tower === tower && row.flat === flat);
+        if (flatData.length > 0) {
+          result[processName] = flatData[0];
+        }
+      }
+    });
+  }
+  
+  return result;
+}
+
+function getDashboardCounts(ss) {
+  const counts = {};
+  
+  SHEET_NAMES.forEach(process => {
+    const sheet = ss.getSheetByName(process);
+    if (sheet) {
+      const lastRow = sheet.getLastRow();
+      counts[process] = lastRow > 1 ? lastRow - 1 : 0;
+    } else {
+      counts[process] = 0;
+    }
+  });
+  
+  return counts;
 }
                         </textarea>
                     </div>
@@ -3381,7 +3555,7 @@ function testSetup() {
                         <input type="text" id="webAppUrl" placeholder="https://script.google.com/macros/s/..." style="font-family: monospace;">
                         <p class="datetime-display">
                             <i class="fas fa-info-circle"></i>
-                            Paste the URL from your deployed web app (ends with /exec)
+                            Paste the URL from your deployed web app
                         </p>
                     </div>
                     
@@ -3392,8 +3566,8 @@ function testSetup() {
                         <button class="btn btn-success" onclick="saveConnection()">
                             <i class="fas fa-save"></i> Save Connection
                         </button>
-                        <button class="btn btn-accent" onclick="quickTest()">
-                            <i class="fas fa-bolt"></i> Quick Test
+                        <button class="btn btn-accent" onclick="syncAllData()">
+                            <i class="fas fa-sync-alt"></i> Sync All Data
                         </button>
                     </div>
                 </div>
@@ -3586,7 +3760,7 @@ function testSetup() {
             },
             'team4_crm': {
                 required: ['tower', 'flat', 'action_type', 'assigned_to', 'start_date'],
-                optional: ['description', 'status', 'priority', 'followup_date', 'remarks']
+                optional: ['registration_completed', 'noc_given_to_cbre', 'remarks']
             },
             'cbre_crm': {
                 required: ['tower', 'flat', 'description', 'informed_to', 'status'],
@@ -3642,7 +3816,7 @@ function testSetup() {
             updateUpcomingEventsWithRealData();
         }
         
-        // Update upcoming events with real data
+        // Update upcoming events with real data - FIXED date formatting
         function updateUpcomingEventsWithRealData() {
             const upcomingFirstVisits = [];
             const upcomingHandovers = [];
@@ -3660,7 +3834,7 @@ function testSetup() {
                         if (visitDate >= today && visitDate <= nextWeek) {
                             upcomingFirstVisits.push({
                                 flat: `${visit.tower}${visit.flat}`,
-                                date: formatDate(visitDate),
+                                date: visitDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
                                 owner: visit.owner_name || 'Not specified'
                             });
                         }
@@ -3676,7 +3850,7 @@ function testSetup() {
                         if (handoverDate >= today && handoverDate <= nextWeek) {
                             upcomingHandovers.push({
                                 flat: `${handover.tower}${handover.flat}`,
-                                date: formatDate(handoverDate),
+                                date: handoverDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
                                 customer: handover.customer_name || 'Not specified'
                             });
                         }
@@ -3704,10 +3878,17 @@ function testSetup() {
                             <strong>${visit.flat}</strong><br>
                             <small>${visit.owner}</small>
                         </div>
-                        <div class="upcoming-date">${visit.date.split(',')[0]}</div>
+                        <div class="upcoming-date">${visit.date}</div>
                     `;
                     firstVisitsContainer.appendChild(item);
                 });
+            } else {
+                firstVisitsContainer.innerHTML = `
+                    <div class="no-events">
+                        <i class="fas fa-calendar-times fa-2x"></i>
+                        <p>No upcoming first visits in the next 7 days</p>
+                    </div>
+                `;
             }
             
             // Update handovers
@@ -3721,10 +3902,17 @@ function testSetup() {
                             <strong>${handover.flat}</strong><br>
                             <small>${handover.customer}</small>
                         </div>
-                        <div class="upcoming-date">${handover.date.split(',')[0]}</div>
+                        <div class="upcoming-date">${handover.date}</div>
                     `;
                     handoversContainer.appendChild(item);
                 });
+            } else {
+                handoversContainer.innerHTML = `
+                    <div class="no-events">
+                        <i class="fas fa-calendar-times fa-2x"></i>
+                        <p>No upcoming handovers in the next 7 days</p>
+                    </div>
+                `;
             }
         }
         
@@ -4010,9 +4198,9 @@ function testSetup() {
             document.getElementById('currentDate').textContent = formatDate(now);
         }
         
-        // Format date for display
+        // Format date for display - FIXED to use toLocaleString
         function formatDate(date) {
-            return date.toLocaleDateString('en-US', {
+            return date.toLocaleString('en-US', {
                 weekday: 'long',
                 year: 'numeric',
                 month: 'long',
@@ -4381,7 +4569,17 @@ function testSetup() {
                 });
         }
         
-        // Populate form with existing data
+        // Load existing data - ADDED MISSING FUNCTION
+        function loadExistingData(process) {
+            if (!currentFlat) {
+                showNotification('Please select a flat first', 'error');
+                return;
+            }
+            
+            loadExistingDataForFlat(currentProcess, currentFlat);
+        }
+        
+        // Populate form with existing data - FIXED TEAM4 CRM population
         function populateForm(process, data) {
             console.log('Populating form for', process, data);
             
@@ -4394,129 +4592,218 @@ function testSetup() {
                 document.getElementById('nocGivenToCBRE').checked = data.noc_given_to_cbre === 'true' || data.noc_given_to_cbre === true;
                 document.getElementById('team4CRMRemarks').value = data.remarks || '';
             }
+            
+            // Populate other forms based on process
+            switch(process) {
+                case 'key_handover':
+                    if (data) {
+                        document.getElementById('handoverPerson').value = data.handover_person || '';
+                        document.getElementById('receivedByCBRE').value = data.received_by_cbre || '';
+                        document.getElementById('handoverDate').value = data.handover_date || '';
+                        document.getElementById('allKeysNotHanded').checked = data.all_keys_not_handed === 'true' || data.all_keys_not_handed === true;
+                        document.getElementById('keyRemarks').value = data.key_remarks || '';
+                        toggleKeyRemarks();
+                    }
+                    break;
+                    
+                case 'snagging':
+                    if (data) {
+                        // Populate all snagging fields
+                        document.getElementById('mepInspector').value = data.mep_inspector || '';
+                        document.getElementById('mepStartDate').value = data.mep_start_date || '';
+                        document.getElementById('mepEndDate').value = data.mep_end_date || '';
+                        document.getElementById('mepCompleted').checked = data.mep_completed === 'true' || data.mep_completed === true;
+                        
+                        document.getElementById('civilInspector').value = data.civil_inspector || '';
+                        document.getElementById('civilStartDate').value = data.civil_start_date || '';
+                        document.getElementById('civilEndDate').value = data.civil_end_date || '';
+                        document.getElementById('civilCompleted').checked = data.civil_completed === 'true' || data.civil_completed === true;
+                        
+                        document.getElementById('electricalInspector').value = data.electrical_inspector || '';
+                        document.getElementById('electricalStartDate').value = data.electrical_start_date || '';
+                        document.getElementById('electricalEndDate').value = data.electrical_end_date || '';
+                        document.getElementById('electricalCompleted').checked = data.electrical_completed === 'true' || data.electrical_completed === true;
+                        
+                        document.getElementById('waterInspector').value = data.water_inspector || '';
+                        document.getElementById('waterStartDate').value = data.water_start_date || '';
+                        document.getElementById('waterEndDate').value = data.water_end_date || '';
+                        document.getElementById('waterCompleted').checked = data.water_completed === 'true' || data.water_completed === true;
+                        
+                        document.getElementById('acDrainInspector').value = data.ac_drain_inspector || '';
+                        document.getElementById('acDrainStartDate').value = data.ac_drain_start_date || '';
+                        document.getElementById('acDrainEndDate').value = data.ac_drain_end_date || '';
+                        document.getElementById('acDrainCompleted').checked = data.ac_drain_completed === 'true' || data.ac_drain_completed === true;
+                        
+                        document.getElementById('tilesInspector').value = data.tiles_inspector || '';
+                        document.getElementById('tilesStartDate').value = data.tiles_start_date || '';
+                        document.getElementById('tilesEndDate').value = data.tiles_end_date || '';
+                        document.getElementById('tilesCompleted').checked = data.tiles_completed === 'true' || data.tiles_completed === true;
+                        
+                        document.getElementById('snagRemarks').value = data.snag_remarks || '';
+                        document.getElementById('followupDate').value = data.followup_date || '';
+                        
+                        checkAllSnaggingCompleted();
+                    }
+                    break;
+                    
+                case 'project_mep':
+                    if (data) {
+                        document.getElementById('snagsStatus').value = data.snags_status || 'attended';
+                        document.getElementById('confirmationDate').value = data.confirmation_date || '';
+                        document.getElementById('cbreChecked').value = data.cbre_checked || 'no';
+                        document.getElementById('cbreCheckedDate').value = data.cbre_checked_date || '';
+                        toggleCBRECheckedDate();
+                    }
+                    break;
+                    
+                case 'cbre_crm':
+                    if (data) {
+                        document.getElementById('cbreCRMDescription').value = data.description || '';
+                        document.getElementById('cbreCRMInformedTo').value = data.informed_to || 'mep';
+                        document.getElementById('cbreCRMStatus').value = data.status || 'open';
+                        document.getElementById('cbreCRMCallerName').value = data.caller_name || '';
+                        document.getElementById('cbreCRMCallerPhone').value = data.caller_phone || '';
+                        document.getElementById('cbreCRMFollowupDate').value = data.followup_date || '';
+                        document.getElementById('cbreCRMRemarks').value = data.remarks || '';
+                        toggleCbreCRMFollowupDate();
+                    }
+                    break;
+                    
+                case 'first_visit':
+                    if (data) {
+                        document.getElementById('ownerName').value = data.owner_name || '';
+                        document.getElementById('ownerPhone').value = data.owner_phone || '';
+                        document.getElementById('visitDateTime').value = data.visit_datetime || '';
+                        document.getElementById('hotMember').value = data.hot_member || '';
+                        document.getElementById('ownerWillInformDate').checked = data.owner_will_inform_date === 'true' || data.owner_will_inform_date === true;
+                        document.getElementById('handoverSuggested').value = data.handover_suggested || '';
+                        document.getElementById('goingForThirdParty').checked = data.going_for_third_party === 'true' || data.going_for_third_party === true;
+                        document.getElementById('customerRemarks').value = data.customer_remarks || '';
+                        document.getElementById('crmNoc').value = data.crm_noc || 'pending';
+                        
+                        toggleHandoverDate();
+                        toggleThirdPartyForm();
+                        
+                        // Third party inspection data
+                        if (data.going_for_third_party === 'true' || data.going_for_third_party === true) {
+                            document.getElementById('thirdPartyDateConfirmed').value = data.third_party_date_confirmed || '';
+                            document.getElementById('reportReceivedDate').value = data.report_received_date || '';
+                            document.getElementById('softCopy').checked = data.soft_copy === 'true' || data.soft_copy === true;
+                            document.getElementById('hardCopy').checked = data.hard_copy === 'true' || data.hard_copy === true;
+                            document.getElementById('informedToProjectTeam').value = data.informed_to_project_team || 'no';
+                            document.getElementById('projectTeamInformedDate').value = data.project_team_informed_date || '';
+                            document.getElementById('cbreCheckingDone').value = data.cbre_checking_done || 'no';
+                            document.getElementById('cbreCheckingDate').value = data.cbre_checking_date || '';
+                            
+                            toggleThirdPartySubForm();
+                            toggleProjectTeamDate();
+                            toggleCBRECheckingDate();
+                        }
+                    }
+                    break;
+                    
+                case 'handover':
+                    if (data) {
+                        document.getElementById('customerName').value = data.customer_name || '';
+                        document.getElementById('customerEmail').value = data.customer_email || '';
+                        document.getElementById('secondOwnerName').value = data.second_owner_name || '';
+                        document.getElementById('secondOwnerEmail').value = data.second_owner_email || '';
+                        document.getElementById('hotoMember').value = data.hoto_member || '';
+                        document.getElementById('handoverDateTime').value = data.handover_datetime || '';
+                        
+                        // Items handed over
+                        const itemsHanded = data.items_handed ? data.items_handed.split(',') : [];
+                        document.getElementById('itemKeys').checked = itemsHanded.includes('keys');
+                        document.getElementById('itemManual').checked = itemsHanded.includes('manual');
+                        document.getElementById('itemGift').checked = itemsHanded.includes('gift');
+                        
+                        document.getElementById('customerFeedback').value = data.customer_feedback || '';
+                        document.getElementById('finalInspection').value = data.final_inspection || 'yes';
+                        document.getElementById('inspectionRemarks').value = data.inspection_remarks || '';
+                        
+                        toggleInspectionRemarks();
+                    }
+                    break;
+                    
+                case 'interiors':
+                    if (data) {
+                        document.getElementById('siteSupervisor').value = data.site_supervisor || '';
+                        document.getElementById('siteSupervisorNumber').value = data.site_supervisor_number || '';
+                        document.getElementById('contractorName').value = data.contractor_name || '';
+                        document.getElementById('contractorContact').value = data.contractor_contact || '';
+                        document.getElementById('workStartDate').value = data.work_start_date || '';
+                        document.getElementById('estimatedEndDate').value = data.estimated_end_date || '';
+                        
+                        // Works planned
+                        const worksPlanned = data.works_planned ? data.works_planned.split(',') : [];
+                        document.getElementById('workFlooring').checked = worksPlanned.includes('flooring');
+                        document.getElementById('workPainting').checked = worksPlanned.includes('painting');
+                        document.getElementById('workElectrical').checked = worksPlanned.includes('electrical');
+                        document.getElementById('workPlumbing').checked = worksPlanned.includes('plumbing');
+                        document.getElementById('workCarpentry').checked = worksPlanned.includes('carpentry');
+                        document.getElementById('workFalseCeiling').checked = worksPlanned.includes('false_ceiling');
+                        document.getElementById('workKitchen').checked = worksPlanned.includes('kitchen');
+                        document.getElementById('workWardrobe').checked = worksPlanned.includes('wardrobe');
+                        
+                        document.getElementById('dosDontsExplained').checked = data.dos_donts_explained === 'true' || data.dos_donts_explained === true;
+                        document.getElementById('multipleVendors').checked = data.multiple_vendors === 'true' || data.multiple_vendors === true;
+                        document.getElementById('interiorsRemarks').value = data.remarks || '';
+                        
+                        toggleMultipleVendors();
+                    }
+                    break;
+                    
+                case 'movein':
+                    if (data) {
+                        document.getElementById('moveinCustomerName').value = data.customer_name || '';
+                        document.getElementById('moveinContact').value = data.contact_number || '';
+                        document.getElementById('moveinDate').value = data.movein_date || '';
+                        document.getElementById('moveinTime').value = data.movein_time || 'morning';
+                        document.getElementById('moveClearanceGiven').checked = data.move_clearance_given === 'true' || data.move_clearance_given === true;
+                        document.getElementById('moveinRemarks').value = data.remarks || '';
+                        
+                        toggleMoveinSave();
+                    }
+                    break;
+            }
         }
         
         // ================== BACKEND COMMUNICATION ==================
         
-        // FIXED: Enhanced backend communication function
+        // Call backend API
         async function callBackend(action, process = null, data = {}) {
             if (!backendUrl) {
                 showNotification('Backend URL not configured. Please set it in the Integration tab.', 'error');
                 return null;
             }
             
-            // Clean and validate the URL
-            let cleanUrl = backendUrl.trim();
-            
-            // Remove trailing slash if present
-            if (cleanUrl.endsWith('/')) {
-                cleanUrl = cleanUrl.slice(0, -1);
+            const url = new URL(backendUrl);
+            url.searchParams.append('action', action);
+            if (process) {
+                url.searchParams.append('process', process);
             }
             
-            // Ensure URL has the correct format
-            if (!cleanUrl.includes('script.google.com')) {
-                showNotification('Invalid Google Apps Script URL. Please check the URL format.', 'error');
-                return null;
-            }
-            
-            // For simple actions like ping, use GET
-            if (action === 'ping' || action === 'test') {
-                const url = new URL(cleanUrl);
-                url.searchParams.append('action', action);
-                url.searchParams.append('t', Date.now()); // Add timestamp to prevent caching
-                
-                try {
-                    console.log(`Testing connection to: ${url.toString()}`);
-                    
-                    // Use fetch with no-cors mode for Google Apps Script
-                    const response = await fetch(url.toString(), {
-                        method: 'GET',
-                        mode: 'no-cors'
-                    });
-                    
-                    // Since we can't read response in no-cors mode, we'll create a mock success response
-                    if (action === 'ping') {
-                        return { 
-                            status: 'online', 
-                            timestamp: new Date().toISOString(),
-                            message: 'Connection successful',
-                            version: '3.0'
-                        };
-                    }
-                    
-                    return { status: 'success', message: 'Test completed' };
-                    
-                } catch (error) {
-                    console.error('Fetch error:', error);
-                    return { status: 'error', message: error.message };
-                }
-            } else {
-                // For other actions, try a different approach
-                return await callBackendWithJSONP(action, process, data);
-            }
-        }
-        
-        // Alternative method using JSONP for Google Apps Script
-        async function callBackendWithJSONP(action, process = null, data = {}) {
-            return new Promise((resolve) => {
-                // Create a unique callback name
-                const callbackName = `jsonpCallback_${Date.now()}`;
-                
-                // Create script element
-                const script = document.createElement('script');
-                
-                // Build URL
-                let url = backendUrl;
-                url += `?action=${encodeURIComponent(action)}`;
-                if (process) {
-                    url += `&process=${encodeURIComponent(process)}`;
-                }
-                url += `&callback=${callbackName}`;
-                url += `&t=${Date.now()}`; // Add timestamp
-                
-                // Add data as query parameters
-                Object.keys(data).forEach(key => {
-                    url += `&${encodeURIComponent(key)}=${encodeURIComponent(data[key])}`;
+            try {
+                const response = await fetch(url.toString(), {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
                 });
                 
-                // Define callback function
-                window[callbackName] = function(response) {
-                    resolve(response);
-                    delete window[callbackName];
-                    if (script.parentNode) {
-                        document.body.removeChild(script);
-                    }
-                };
+                const result = await response.json();
                 
-                // Set error handler
-                script.onerror = function() {
-                    resolve({ 
-                        status: 'error', 
-                        message: 'Failed to load script. Check CORS settings.' 
-                    });
-                    delete window[callbackName];
-                    if (script.parentNode) {
-                        document.body.removeChild(script);
-                    }
-                };
+                if (result.error) {
+                    showNotification('Error: ' + result.error, 'error');
+                    return null;
+                }
                 
-                script.src = url;
-                document.body.appendChild(script);
-                
-                // Set timeout
-                setTimeout(() => {
-                    if (window[callbackName]) {
-                        resolve({ 
-                            status: 'error', 
-                            message: 'Request timeout. Server may be unresponsive.' 
-                        });
-                        delete window[callbackName];
-                        if (script.parentNode) {
-                            document.body.removeChild(script);
-                        }
-                    }
-                }, 10000); // 10 second timeout
-            });
+                return result;
+            } catch (error) {
+                showNotification('Connection error: ' + error.message, 'error');
+                return null;
+            }
         }
         
         // Test backend connection
@@ -5013,6 +5300,128 @@ function testSetup() {
             }
         }
         
+        // Save First Visit - ADDED MISSING FUNCTION
+        async function saveFirstVisit() {
+            const data = {
+                tower: currentTower,
+                flat: currentFlat.substring(1), // Remove tower prefix
+                owner_name: document.getElementById('ownerName').value,
+                owner_phone: document.getElementById('ownerPhone').value,
+                visit_datetime: document.getElementById('visitDateTime').value,
+                hot_member: document.getElementById('hotMember').value,
+                owner_will_inform_date: document.getElementById('ownerWillInformDate').checked ? 'true' : 'false',
+                handover_suggested: document.getElementById('handoverSuggested').value,
+                going_for_third_party: document.getElementById('goingForThirdParty').checked ? 'true' : 'false',
+                third_party_date_confirmed: document.getElementById('thirdPartyDateConfirmed').value,
+                report_received_date: document.getElementById('reportReceivedDate').value,
+                soft_copy: document.getElementById('softCopy').checked ? 'true' : 'false',
+                hard_copy: document.getElementById('hardCopy').checked ? 'true' : 'false',
+                informed_to_project_team: document.getElementById('informedToProjectTeam').value,
+                project_team_informed_date: document.getElementById('projectTeamInformedDate').value,
+                cbre_checking_done: document.getElementById('cbreCheckingDone').value,
+                cbre_checking_date: document.getElementById('cbreCheckingDate').value,
+                customer_remarks: document.getElementById('customerRemarks').value,
+                crm_noc: document.getElementById('crmNoc').value
+            };
+            
+            const result = await callBackend('save_data', 'first_visit', data);
+            if (result && result.success) {
+                showNotification('First visit data saved successfully', 'success');
+                resetVisitForm();
+                loadDashboardData();
+                loadAllProcessData(); // Reload process data
+            }
+        }
+        
+        // Save Handover - ADDED MISSING FUNCTION
+        async function saveHandover() {
+            const itemsHanded = [];
+            if (document.getElementById('itemKeys').checked) itemsHanded.push('keys');
+            if (document.getElementById('itemManual').checked) itemsHanded.push('manual');
+            if (document.getElementById('itemGift').checked) itemsHanded.push('gift');
+            
+            const data = {
+                tower: currentTower,
+                flat: currentFlat.substring(1), // Remove tower prefix
+                customer_name: document.getElementById('customerName').value,
+                customer_email: document.getElementById('customerEmail').value,
+                second_owner_name: document.getElementById('secondOwnerName').value,
+                second_owner_email: document.getElementById('secondOwnerEmail').value,
+                hoto_member: document.getElementById('hotoMember').value,
+                handover_datetime: document.getElementById('handoverDateTime').value,
+                items_handed: itemsHanded.join(','),
+                customer_feedback: document.getElementById('customerFeedback').value,
+                final_inspection: document.getElementById('finalInspection').value,
+                inspection_remarks: document.getElementById('inspectionRemarks').value
+            };
+            
+            const result = await callBackend('save_data', 'handover', data);
+            if (result && result.success) {
+                showNotification('Handover data saved successfully', 'success');
+                resetHandoverForm();
+                loadDashboardData();
+                loadAllProcessData(); // Reload process data
+            }
+        }
+        
+        // Save Interiors - ADDED MISSING FUNCTION
+        async function saveInteriors() {
+            const worksPlanned = [];
+            if (document.getElementById('workFlooring').checked) worksPlanned.push('flooring');
+            if (document.getElementById('workPainting').checked) worksPlanned.push('painting');
+            if (document.getElementById('workElectrical').checked) worksPlanned.push('electrical');
+            if (document.getElementById('workPlumbing').checked) worksPlanned.push('plumbing');
+            if (document.getElementById('workCarpentry').checked) worksPlanned.push('carpentry');
+            if (document.getElementById('workFalseCeiling').checked) worksPlanned.push('false_ceiling');
+            if (document.getElementById('workKitchen').checked) worksPlanned.push('kitchen');
+            if (document.getElementById('workWardrobe').checked) worksPlanned.push('wardrobe');
+            
+            const data = {
+                tower: currentTower,
+                flat: currentFlat.substring(1), // Remove tower prefix
+                site_supervisor: document.getElementById('siteSupervisor').value,
+                site_supervisor_number: document.getElementById('siteSupervisorNumber').value,
+                contractor_name: document.getElementById('contractorName').value,
+                contractor_contact: document.getElementById('contractorContact').value,
+                work_start_date: document.getElementById('workStartDate').value,
+                estimated_end_date: document.getElementById('estimatedEndDate').value,
+                works_planned: worksPlanned.join(','),
+                dos_donts_explained: document.getElementById('dosDontsExplained').checked ? 'true' : 'false',
+                multiple_vendors: document.getElementById('multipleVendors').checked ? 'true' : 'false',
+                remarks: document.getElementById('interiorsRemarks').value
+            };
+            
+            const result = await callBackend('save_data', 'interiors', data);
+            if (result && result.success) {
+                showNotification('Interiors data saved successfully', 'success');
+                resetInteriorsForm();
+                loadDashboardData();
+                loadAllProcessData(); // Reload process data
+            }
+        }
+        
+        // Save Move-in - ADDED MISSING FUNCTION
+        async function saveMoveIn() {
+            const data = {
+                tower: currentTower,
+                flat: currentFlat.substring(1), // Remove tower prefix
+                customer_name: document.getElementById('moveinCustomerName').value,
+                contact_number: document.getElementById('moveinContact').value,
+                movein_date: document.getElementById('moveinDate').value,
+                movein_time: document.getElementById('moveinTime').value,
+                move_clearance_given: document.getElementById('moveClearanceGiven').checked ? 'true' : 'false',
+                remarks: document.getElementById('moveinRemarks').value
+            };
+            
+            const result = await callBackend('save_data', 'movein', data);
+            if (result && result.success) {
+                showNotification('Move-in data saved successfully', 'success');
+                resetMoveInForm();
+                loadDashboardData();
+                loadAllProcessData(); // Reload process data
+            }
+        }
+        
         // ================== UTILITY FUNCTIONS ==================
         
         // Show notification
@@ -5110,6 +5519,71 @@ function testSetup() {
             toggleCbreCRMFollowupDate();
         }
         
+        function resetVisitForm() {
+            document.getElementById('ownerName').value = '';
+            document.getElementById('ownerPhone').value = '';
+            document.getElementById('visitDateTime').value = new Date().toISOString().slice(0, 16);
+            document.getElementById('hotMember').value = '';
+            document.getElementById('ownerWillInformDate').checked = false;
+            document.getElementById('handoverSuggested').value = '';
+            document.getElementById('goingForThirdParty').checked = false;
+            document.getElementById('customerRemarks').value = '';
+            document.getElementById('crmNoc').value = 'pending';
+            
+            toggleHandoverDate();
+            toggleThirdPartyForm();
+        }
+        
+        function resetHandoverForm() {
+            document.getElementById('customerName').value = '';
+            document.getElementById('customerEmail').value = '';
+            document.getElementById('secondOwnerName').value = '';
+            document.getElementById('secondOwnerEmail').value = '';
+            document.getElementById('hotoMember').value = '';
+            document.getElementById('handoverDateTime').value = new Date().toISOString().slice(0, 16);
+            document.getElementById('itemKeys').checked = false;
+            document.getElementById('itemManual').checked = false;
+            document.getElementById('itemGift').checked = false;
+            document.getElementById('customerFeedback').value = '';
+            document.getElementById('finalInspection').value = 'yes';
+            document.getElementById('inspectionRemarks').value = '';
+            
+            toggleInspectionRemarks();
+        }
+        
+        function resetInteriorsForm() {
+            document.getElementById('siteSupervisor').value = '';
+            document.getElementById('siteSupervisorNumber').value = '';
+            document.getElementById('contractorName').value = '';
+            document.getElementById('contractorContact').value = '';
+            document.getElementById('workStartDate').value = new Date().toISOString().split('T')[0];
+            document.getElementById('estimatedEndDate').value = '';
+            document.getElementById('workFlooring').checked = false;
+            document.getElementById('workPainting').checked = false;
+            document.getElementById('workElectrical').checked = false;
+            document.getElementById('workPlumbing').checked = false;
+            document.getElementById('workCarpentry').checked = false;
+            document.getElementById('workFalseCeiling').checked = false;
+            document.getElementById('workKitchen').checked = false;
+            document.getElementById('workWardrobe').checked = false;
+            document.getElementById('dosDontsExplained').checked = false;
+            document.getElementById('multipleVendors').checked = false;
+            document.getElementById('interiorsRemarks').value = '';
+            
+            toggleMultipleVendors();
+        }
+        
+        function resetMoveInForm() {
+            document.getElementById('moveinCustomerName').value = '';
+            document.getElementById('moveinContact').value = '';
+            document.getElementById('moveinDate').value = new Date().toISOString().split('T')[0];
+            document.getElementById('moveinTime').value = 'morning';
+            document.getElementById('moveClearanceGiven').checked = false;
+            document.getElementById('moveinRemarks').value = '';
+            
+            toggleMoveinSave();
+        }
+        
         // ================== TOGGLE FUNCTIONS ==================
         
         function toggleKeyRemarks() {
@@ -5134,6 +5608,48 @@ function testSetup() {
         function toggleCbreCRMFollowupDate() {
             const showDate = document.getElementById('cbreCRMStatus').value === 'open';
             document.getElementById('cbreCRMFollowupDateContainer').style.display = showDate ? 'block' : 'none';
+        }
+        
+        function toggleHandoverDate() {
+            const showDate = !document.getElementById('ownerWillInformDate').checked;
+            document.getElementById('handoverSuggestedContainer').style.display = showDate ? 'block' : 'none';
+        }
+        
+        function toggleThirdPartyForm() {
+            const showForm = document.getElementById('goingForThirdParty').checked;
+            document.getElementById('thirdPartyForm').style.display = showForm ? 'block' : 'none';
+        }
+        
+        function toggleThirdPartySubForm() {
+            const showSubForm = !document.getElementById('dateNotConfirmed').checked;
+            document.getElementById('thirdPartySubForm').style.display = showSubForm ? 'block' : 'none';
+        }
+        
+        function toggleProjectTeamDate() {
+            const showDate = document.getElementById('informedToProjectTeam').value === 'yes';
+            document.getElementById('projectTeamDateContainer').style.display = showDate ? 'block' : 'none';
+        }
+        
+        function toggleCBRECheckingDate() {
+            const showDate = document.getElementById('cbreCheckingDone').value === 'yes';
+            document.getElementById('cbreCheckingDateContainer').style.display = showDate ? 'block' : 'none';
+        }
+        
+        function toggleInspectionRemarks() {
+            const showRemarks = document.getElementById('finalInspection').value !== 'yes';
+            document.getElementById('inspectionRemarksContainer').style.display = showRemarks ? 'block' : 'none';
+        }
+        
+        function toggleMultipleVendors() {
+            const multipleVendors = document.getElementById('multipleVendors').checked;
+            document.getElementById('mainVendorForm').style.display = multipleVendors ? 'none' : 'block';
+            document.getElementById('additionalVendorsContainer').style.display = multipleVendors ? 'block' : 'none';
+            document.getElementById('addVendorBtn').style.display = multipleVendors ? 'inline-flex' : 'none';
+        }
+        
+        function toggleMoveinSave() {
+            const moveClearanceGiven = document.getElementById('moveClearanceGiven').checked;
+            document.getElementById('saveMoveinBtn').disabled = !moveClearanceGiven;
         }
         
         function checkAllSnaggingCompleted() {
@@ -5600,6 +6116,7 @@ function testSetup() {
         
         // ================== MODAL FUNCTIONS ==================
         
+        // View flat details - ADDED MISSING FUNCTION
         function viewFlatDetails() {
             // Load and display flat details in modal
             const modal = document.getElementById('flatDetailsModal');
@@ -5754,61 +6271,25 @@ function testSetup() {
         
         // ================== INTEGRATION TAB FUNCTIONS ==================
         
-        async function testConnection() {
+        function testConnection() {
             const url = document.getElementById('webAppUrl').value;
             if (!url) {
                 showNotification('Please enter a Web App URL', 'error');
                 return;
             }
             
-            // Validate URL format
-            if (!url.includes('script.google.com')) {
-                showNotification('URL must be a Google Apps Script web app URL', 'error');
-                return;
-            }
-            
-            // Store the URL
             backendUrl = url;
             localStorage.setItem('hoto_backend_url', url);
             
-            // Show testing message
-            showNotification('Testing connection to Google Apps Script...', 'info');
-            
-            // Test with ping
-            const result = await callBackend('ping');
-            
-            if (result && result.status === 'online') {
-                document.getElementById('connectionIndicator').style.color = '#28a745';
-                document.getElementById('connectionStatus').className = 'status-badge status-connected';
-                document.getElementById('connectionStatus').innerHTML = '<i class="fas fa-check-circle"></i> Connected';
-                document.getElementById('lastSyncTime').textContent = new Date().toLocaleTimeString();
-                showNotification('✓ Connection successful!', 'success');
-                
-                // Update local records count
-                updateLocalRecordsCount();
-            } else {
-                document.getElementById('connectionIndicator').style.color = '#dc3545';
-                document.getElementById('connectionStatus').className = 'status-badge status-disconnected';
-                document.getElementById('connectionStatus').innerHTML = '<i class="fas fa-times-circle"></i> Disconnected';
-                showNotification('Connection failed. Please check: 1) URL is correct 2) Web app is deployed 3) Access is set to "Anyone"', 'error');
-            }
-        }
-        
-        function updateLocalRecordsCount() {
-            let total = 0;
-            Object.keys(localStorage).forEach(key => {
-                if (key.startsWith('hoto_')) {
-                    try {
-                        const data = JSON.parse(localStorage.getItem(key));
-                        if (Array.isArray(data)) {
-                            total += data.length;
-                        }
-                    } catch (e) {
-                        // Ignore non-JSON data
-                    }
+            testBackendConnection().then(success => {
+                if (success) {
+                    document.getElementById('connectionStatus').className = 'status-badge status-connected';
+                    document.getElementById('connectionStatus').innerHTML = '<i class="fas fa-check-circle"></i> Connected';
+                    document.getElementById('lastSyncTime').textContent = new Date().toLocaleTimeString();
+                    showNotification('Connection successful!', 'success');
+                    loadAllProcessData();
                 }
             });
-            document.getElementById('localRecordsCount').textContent = total + ' records';
         }
         
         function saveConnection() {
@@ -5845,44 +6326,18 @@ function testSetup() {
             // Implementation would download a complete Excel template
         }
         
-        // Quick test function for troubleshooting
-        async function quickTest() {
-            const url = document.getElementById('webAppUrl').value;
-            if (!url) {
-                showNotification('Please enter a URL first', 'error');
-                return;
-            }
-            
-            // Simple test without CORS issues
-            const testUrl = url + '?action=ping&t=' + Date.now();
-            
-            try {
-                // Try different methods
-                showNotification('Testing connection with different methods...', 'info');
-                
-                // Method 1: Simple fetch with no-cors
-                const response1 = await fetch(testUrl, { mode: 'no-cors' });
-                console.log('Method 1 (no-cors):', response1);
-                
-                // Method 2: JSONP
-                const jsonpResult = await callBackendWithJSONP('ping');
-                console.log('Method 2 (JSONP):', jsonpResult);
-                
-                // Method 3: Image load (simple check)
-                const img = new Image();
-                img.src = testUrl;
-                img.onload = function() {
-                    showNotification('Image load successful - server is reachable', 'success');
-                };
-                img.onerror = function() {
-                    showNotification('Image load failed', 'warning');
-                };
-                
-                showNotification('Test completed. Check console for details.', 'info');
-                
-            } catch (error) {
-                showNotification('Test error: ' + error.message, 'error');
-            }
+        // Vendor management functions
+        function addAdditionalVendor() {
+            const container = document.getElementById('additionalVendorsContainer');
+            const newVendorForm = container.cloneNode(true);
+            newVendorForm.id = 'additionalVendorsContainer' + Date.now();
+            newVendorForm.classList.remove('hidden');
+            container.parentNode.insertBefore(newVendorForm, container.nextSibling);
+        }
+        
+        function removeVendor(button) {
+            const vendorForm = button.closest('.vendor-form');
+            vendorForm.remove();
         }
         
         // Close modals when clicking outside
