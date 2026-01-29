@@ -3596,13 +3596,14 @@ function testSetup() {
         
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
-            silentInitialize();
+            initializeApp();
+            loadDashboardData();
             updateDateTime();
             setInterval(updateDateTime, 60000); // Update every minute
         });
         
-        // Silent initialization without notifications
-        function silentInitialize() {
+        // Initialize the application
+        function initializeApp() {
             // Set current date
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('currentDate').textContent = formatDate(new Date());
@@ -3613,51 +3614,36 @@ function testSetup() {
             // Initialize floor buttons for all processes
             initializeFloorButtons();
             
-            // Silent backend connection test if URL exists
+            // Test backend connection if URL exists
             if (backendUrl) {
-                silentTestBackendConnection();
+                testBackendConnection();
             }
             
             // Initialize charts with empty data
             initializeCharts();
             
             // Load all process data for workflow filtering
-            silentLoadAllProcessData();
+            loadAllProcessData();
             
             // Setup Excel file input listener
             setupExcelFileInput();
             
             // Load upcoming events
-            silentLoadUpcomingEvents();
+            loadUpcomingEvents();
             
             // Initialize tower progress chart
             updateTowerProgressChart();
         }
         
-        // Silent backend connection test (no notifications)
-        async function silentTestBackendConnection() {
-            try {
-                const result = await callBackend('ping');
-                if (result && result.status === 'online') {
-                    document.getElementById('connectionIndicator').style.color = '#28a745';
-                    return true;
-                }
-            } catch (error) {
-                // Silently fail - don't show notification
-            }
-            document.getElementById('connectionIndicator').style.color = '#dc3545';
-            return false;
-        }
-        
-        // Silent load upcoming first visits and handovers
-        function silentLoadUpcomingEvents() {
+        // Load upcoming first visits and handovers
+        function loadUpcomingEvents() {
             // This function should load real data from backend
             // For now, we'll use dummy data
-            silentUpdateUpcomingEventsWithRealData();
+            updateUpcomingEventsWithRealData();
         }
         
-        // Update upcoming events with real data silently
-        function silentUpdateUpcomingEventsWithRealData() {
+        // Update upcoming events with real data
+        function updateUpcomingEventsWithRealData() {
             const upcomingFirstVisits = [];
             const upcomingHandovers = [];
             
@@ -3698,12 +3684,12 @@ function testSetup() {
                 });
             }
             
-            // Update UI silently
-            silentUpdateUpcomingEventsUI(upcomingFirstVisits, upcomingHandovers);
+            // Update UI
+            updateUpcomingEventsUI(upcomingFirstVisits, upcomingHandovers);
         }
         
-        // Update upcoming events UI silently
-        function silentUpdateUpcomingEventsUI(firstVisits, handovers) {
+        // Update upcoming events UI
+        function updateUpcomingEventsUI(firstVisits, handovers) {
             const firstVisitsContainer = document.getElementById('upcomingFirstVisits');
             const handoversContainer = document.getElementById('upcomingHandovers');
             
@@ -3739,29 +3725,6 @@ function testSetup() {
                     `;
                     handoversContainer.appendChild(item);
                 });
-            }
-        }
-        
-        // Silent load all process data for workflow filtering
-        async function silentLoadAllProcessData() {
-            if (!backendUrl) return;
-            
-            try {
-                const response = await callBackend('get_all_data');
-                if (response) {
-                    allProcessData = response;
-                    
-                    // Update upcoming events with real data silently
-                    silentUpdateUpcomingEventsWithRealData();
-                    
-                    // Update tower progress chart with real data silently
-                    updateTowerProgressChart();
-                    
-                    // Update dashboard with real data
-                    silentUpdateDashboardKPIs();
-                }
-            } catch (error) {
-                // Silently fail - don't show notification
             }
         }
         
@@ -3874,12 +3837,8 @@ function testSetup() {
             // Enable/disable import button
             document.getElementById('processImportBtn').disabled = validRows.length === 0;
             
-            // Only show notification if there are errors during manual validation
-            if (errorRows.length > 0) {
-                showNotification(`Validation complete: ${validRows.length} valid rows, ${errorRows.length} rows with errors`, 'warning');
-            } else if (validRows.length > 0) {
-                showNotification(`Validation complete: ${validRows.length} valid rows`, 'success');
-            }
+            showNotification(`Validation complete: ${validRows.length} valid rows, ${errorRows.length} rows with errors`, 
+                           validRows.length > 0 ? 'success' : 'warning');
         }
         
         // Update validation results UI
@@ -3988,6 +3947,27 @@ function testSetup() {
             return date instanceof Date && !isNaN(date);
         }
         
+        // Load all process data for workflow filtering
+        async function loadAllProcessData() {
+            if (!backendUrl) return;
+            
+            try {
+                const response = await callBackend('get_all_data');
+                if (response) {
+                    allProcessData = response;
+                    console.log('All process data loaded:', allProcessData);
+                    
+                    // Update upcoming events with real data
+                    updateUpcomingEventsWithRealData();
+                    
+                    // Update tower progress chart with real data
+                    updateTowerProgressChart();
+                }
+            } catch (error) {
+                console.error('Error loading process data:', error);
+            }
+        }
+        
         // Set default dates in form fields
         function setDefaultDates() {
             const today = new Date().toISOString().split('T')[0];
@@ -4069,13 +4049,13 @@ function testSetup() {
             
             // Load data for the selected tab
             if (tabName === 'dashboard') {
-                silentLoadDashboardData();
+                loadDashboardData();
             } else if (tabName === 'analytics') {
-                silentLoadAnalyticsData();
+                loadAnalyticsData();
             }
             
             // Reload all process data when switching tabs
-            silentLoadAllProcessData();
+            loadAllProcessData();
         }
         
         // Select tower for a process
@@ -4202,9 +4182,11 @@ function testSetup() {
             
             // Show the form container if there are flats
             const formContainer = document.getElementById(`${process}-form-container`);
-            if (formContainer) {
-                formContainer.style.display = container.children.length > 0 ? 'block' : 'none';
-                // Don't show notification - this is normal when filtering by workflow
+            if (formContainer && container.children.length > 0) {
+                formContainer.style.display = 'block';
+            } else if (formContainer) {
+                formContainer.style.display = 'none';
+                showNotification(`No flats available for ${process.replace('-', ' ')} on floor ${floor}`, 'info');
             }
         }
         
@@ -4391,16 +4373,18 @@ function testSetup() {
                 .then(data => {
                     if (data && data[apiProcess]) {
                         populateForm(apiProcess, data[apiProcess]);
-                        // Don't show notification for initial load
+                        showNotification('Existing data loaded for flat ' + flat.substring(1), 'success');
                     }
                 })
                 .catch(error => {
-                    // Silently fail - no notification
+                    console.log('No existing data found for flat ' + flat.substring(1));
                 });
         }
         
         // Populate form with existing data
         function populateForm(process, data) {
+            console.log('Populating form for', process, data);
+            
             // Update TEAM4 CRM form with new structure
             if (process === 'team4_crm' && data) {
                 document.getElementById('team4CRMAction').value = data.action_type || 'handover';
@@ -4417,7 +4401,7 @@ function testSetup() {
         // FIXED: Enhanced backend communication function
         async function callBackend(action, process = null, data = {}) {
             if (!backendUrl) {
-                // Don't show notification for initial load
+                showNotification('Backend URL not configured. Please set it in the Integration tab.', 'error');
                 return null;
             }
             
@@ -4431,6 +4415,7 @@ function testSetup() {
             
             // Ensure URL has the correct format
             if (!cleanUrl.includes('script.google.com')) {
+                showNotification('Invalid Google Apps Script URL. Please check the URL format.', 'error');
                 return null;
             }
             
@@ -4441,6 +4426,8 @@ function testSetup() {
                 url.searchParams.append('t', Date.now()); // Add timestamp to prevent caching
                 
                 try {
+                    console.log(`Testing connection to: ${url.toString()}`);
+                    
                     // Use fetch with no-cors mode for Google Apps Script
                     const response = await fetch(url.toString(), {
                         method: 'GET',
@@ -4460,6 +4447,7 @@ function testSetup() {
                     return { status: 'success', message: 'Test completed' };
                     
                 } catch (error) {
+                    console.error('Fetch error:', error);
                     return { status: 'error', message: error.message };
                 }
             } else {
@@ -4540,27 +4528,22 @@ function testSetup() {
                 return true;
             } else {
                 document.getElementById('connectionIndicator').style.color = '#dc3545';
-                showNotification('Connection failed. Please check your configuration.', 'error');
                 return false;
             }
         }
         
         // ================== DASHBOARD FUNCTIONS ==================
         
-        // Silent load dashboard data
-        async function silentLoadDashboardData() {
-            try {
-                const result = await callBackend('get_dashboard_counts');
-                if (result) {
-                    silentUpdateDashboardKPIs(result);
-                }
-            } catch (error) {
-                // Silently fail for initial load
+        // Load dashboard data
+        async function loadDashboardData() {
+            const result = await callBackend('get_dashboard_counts');
+            if (result) {
+                updateDashboardKPIs(result);
             }
         }
         
-        // Silent update dashboard KPIs with real data
-        function silentUpdateDashboardKPIs(data) {
+        // Update dashboard KPIs with real data
+        function updateDashboardKPIs(data) {
             // Calculate total flats based on new configuration
             const totalFlats = BUILDING_CONFIG.towers.length * BUILDING_CONFIG.floors * BUILDING_CONFIG.flatsPerFloor;
             
@@ -4598,7 +4581,7 @@ function testSetup() {
             document.getElementById('currentDate').textContent = 'Last updated: ' + new Date().toLocaleTimeString();
             
             // Update upcoming events
-            silentUpdateUpcomingEventsWithRealData();
+            updateUpcomingEventsWithRealData();
         }
         
         // Calculate counts based on workflow
@@ -4918,8 +4901,8 @@ function testSetup() {
             if (result && result.success) {
                 showNotification('Key handover saved successfully', 'success');
                 resetKeyForm();
-                silentLoadDashboardData();
-                silentLoadAllProcessData(); // Reload process data
+                loadDashboardData();
+                loadAllProcessData(); // Reload process data
             }
         }
         
@@ -4960,8 +4943,8 @@ function testSetup() {
             if (result && result.success) {
                 showNotification('Snagging data saved successfully', 'success');
                 checkAllSnaggingCompleted();
-                silentLoadDashboardData();
-                silentLoadAllProcessData(); // Reload process data
+                loadDashboardData();
+                loadAllProcessData(); // Reload process data
             }
         }
         
@@ -4980,8 +4963,8 @@ function testSetup() {
             if (result && result.success) {
                 showNotification('Project/MEP data saved successfully', 'success');
                 resetProjectMEPForm();
-                silentLoadDashboardData();
-                silentLoadAllProcessData(); // Reload process data
+                loadDashboardData();
+                loadAllProcessData(); // Reload process data
             }
         }
         
@@ -5002,8 +4985,8 @@ function testSetup() {
             if (result && result.success) {
                 showNotification('TEAM4 CRM data saved successfully', 'success');
                 resetTeam4CRMForm();
-                silentLoadDashboardData();
-                silentLoadAllProcessData(); // Reload process data
+                loadDashboardData();
+                loadAllProcessData(); // Reload process data
             }
         }
         
@@ -5025,8 +5008,8 @@ function testSetup() {
             if (result && result.success) {
                 showNotification('CBRE CRM call data saved successfully', 'success');
                 resetCbreCRMForm();
-                silentLoadDashboardData();
-                silentLoadAllProcessData(); // Reload process data
+                loadDashboardData();
+                loadAllProcessData(); // Reload process data
             }
         }
         
@@ -5055,12 +5038,11 @@ function testSetup() {
         // Refresh data
         function refreshData() {
             if (selectedTab === 'dashboard') {
-                silentLoadDashboardData();
-                showNotification('Data refreshed', 'success');
+                loadDashboardData();
             } else if (selectedTab === 'analytics') {
-                silentLoadAnalyticsData();
-                showNotification('Analytics refreshed', 'success');
+                loadAnalyticsData();
             }
+            showNotification('Data refreshed', 'success');
         }
         
         // ================== RESET FORM FUNCTIONS ==================
@@ -5301,15 +5283,14 @@ function testSetup() {
             };
         }
         
-        // Silent load analytics data
-        function silentLoadAnalyticsData() {
+        function loadAnalyticsData() {
             // Load analytics data from real data
-            silentUpdateAnalyticsChartsWithRealData();
+            updateAnalyticsChartsWithRealData();
         }
         
-        // Silent update analytics charts with real data
-        function silentUpdateAnalyticsChartsWithRealData() {
+        function updateAnalyticsChartsWithRealData() {
             if (!allProcessData || Object.keys(allProcessData).length === 0) {
+                console.log('No real data available for analytics');
                 return;
             }
             
@@ -5356,7 +5337,7 @@ function testSetup() {
                 chartInstances.statusChart.update();
             }
             
-            // Don't show notification - silent update
+            showNotification('Analytics updated with real data', 'success');
         }
         
         function calculateTowerDistribution() {
@@ -5494,12 +5475,12 @@ function testSetup() {
             event.target.classList.add('active');
             
             // Refresh analytics with new date range
-            silentLoadAnalyticsData();
+            loadAnalyticsData();
         }
         
         function refreshAnalytics() {
-            silentLoadAllProcessData().then(() => {
-                silentLoadAnalyticsData();
+            loadAllProcessData().then(() => {
+                loadAnalyticsData();
                 showNotification('Analytics refreshed with latest data', 'success');
             });
         }
